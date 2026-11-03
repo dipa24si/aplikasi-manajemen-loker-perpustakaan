@@ -1,0 +1,15 @@
+{
+  "name": "manajemen-peminjaman-loker",
+  "version": "1.0.0",
+  "description": "Sistem Manajemen Peminjaman Loker Perpustakaan (React + Node.js + SLiMS Ready)",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm run dev",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,emerald\" \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
+
