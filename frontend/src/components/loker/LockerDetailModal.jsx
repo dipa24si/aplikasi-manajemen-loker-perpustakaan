@@ -9,7 +9,6 @@ import {
   Calendar, 
   Clock, 
   MapPin, 
-  Maximize2, 
   AlertTriangle,
   ArrowRightCircle,
   RotateCcw
@@ -58,11 +57,6 @@ export default function LockerDetailModal({
               <span className="flex items-center gap-1 font-medium">
                 <MapPin className="w-3.5 h-3.5 text-[#8b500b]" />
                 {loker.lokasi || 'Tidak ada lokasi khusus'}
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1 uppercase font-bold text-[#75777e]">
-                <Maximize2 className="w-3.5 h-3.5" />
-                {loker.ukuran}
               </span>
             </div>
           </div>

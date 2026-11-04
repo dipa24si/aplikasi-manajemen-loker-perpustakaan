@@ -39,13 +39,13 @@ export default function Badge({ status, text, size = 'md' }) {
       break;
 
     case 'admin':
-      colorClasses = 'bg-purple-50 text-purple-700 border-purple-200';
-      label = 'Admin';
+      colorClasses = 'bg-[#031633] text-white border-[#031633] font-bold text-[10px] uppercase tracking-wider';
+      label = 'Super Admin';
       break;
 
     case 'petugas':
-      colorClasses = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      label = 'Petugas';
+      colorClasses = 'bg-[#ffdcc0] text-[#6b3b00] border-[#ffdcc0] font-bold text-[10px] uppercase tracking-wider';
+      label = 'Petugas Sirkulasi';
       break;
   }
 

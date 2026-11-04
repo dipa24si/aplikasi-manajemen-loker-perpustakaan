@@ -15,7 +15,6 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
   const overdue = loker ? isOverdue(loker.batas_kembali, loker.status) : false;
   const infoDenda = loker ? hitungDenda(loker.batas_kembali) : { hariTerlambat: 0, totalDenda: 0 };
 
-  // SEMUA HOOKS DI ATAS SEBELUM RETURN APAPUN
   useEffect(() => {
     if (isOpen && loker) {
       let initialDenda = infoDenda.totalDenda;
@@ -29,7 +28,6 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
     }
   }, [isOpen, loker, isKeyLost]);
 
-  // Jika modal ditutup atau loker belum dipilih, tidak render apa pun
   if (!isOpen || !loker) return null;
 
   const handleKeyLostToggle = (e) => {
@@ -74,7 +72,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
       title={`Pengembalian Loker ${loker.nomor}`}
       maxWidth="max-w-md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 font-hanken">
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -83,18 +81,18 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
         )}
 
         {/* Info Peminjaman */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
+        <div className="bg-[#faf9f6] border border-[#e3e2e0] rounded-xl p-3.5 space-y-2 text-xs">
           <div className="flex justify-between items-center">
-            <span className="text-slate-500">Nomor Loker</span>
-            <span className="font-mono font-bold text-slate-800 text-sm">{loker.nomor}</span>
+            <span className="text-[#75777e]">Nomor Loker</span>
+            <span className="font-mono font-bold text-[#031633] text-sm">{loker.nomor}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-slate-500">Peminjam</span>
-            <span className="font-semibold text-slate-800">{loker.member_name || loker.member_id}</span>
+            <span className="text-[#75777e]">Peminjam</span>
+            <span className="font-bold text-[#031633]">{loker.member_name || loker.member_id}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-slate-500">Waktu Pinjam</span>
-            <span className="text-slate-700">{formatDate(loker.tanggal_pinjam)}</span>
+            <span className="text-[#75777e]">Waktu Pinjam</span>
+            <span className="text-[#44474e] font-medium">{formatDate(loker.tanggal_pinjam)}</span>
           </div>
         </div>
 
@@ -112,7 +110,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
         ) : (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>Dikembalikan tepat waktu sebelum jam 16:00 (Bebas Denda).</span>
+            <span className="font-medium">Dikembalikan tepat waktu sebelum jam 16:00 (Bebas Denda).</span>
           </div>
         )}
 
@@ -123,7 +121,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
               type="checkbox"
               checked={isKeyLost}
               onChange={handleKeyLostToggle}
-              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer"
+              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-[#c5c6ce] cursor-pointer"
             />
             <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-800">
               <Key className="w-4 h-4 text-rose-500" />
@@ -134,7 +132,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
 
         {/* Input Denda */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
             Total Denda yang Dikenakan (Rp)
           </label>
           <input
@@ -143,13 +141,13 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
             step="1000"
             value={denda}
             onChange={(e) => setDenda(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
           />
         </div>
 
         {/* Catatan */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
             Catatan Tambahan
           </label>
           <input
@@ -157,7 +155,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
             placeholder="Catatan..."
             value={catatan}
             onChange={(e) => setCatatan(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
           />
         </div>
 
@@ -166,9 +164,9 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-indigo-600/20 transition-all text-sm disabled:opacity-50 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold py-2.5 px-4 rounded-xl shadow-xs transition-all text-xs disabled:opacity-50 cursor-pointer"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 text-[#ffdcc0]" />
             {loading ? 'Menyimpan...' : 'Konfirmasi Pengembalian'}
           </button>
         </div>

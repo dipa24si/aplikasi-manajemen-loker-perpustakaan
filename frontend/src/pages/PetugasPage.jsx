@@ -99,33 +99,33 @@ export default function PetugasPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 font-hanken">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+          <h2 className="font-editorial text-2xl font-bold text-[#031633] tracking-tight">
             Manajemen Akun Petugas & Admin
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-[#75777e] mt-0.5">
             Kelola hak akses staf perpustakaan untuk mengoperasikan sistem loker.
           </p>
         </div>
 
         <button
           onClick={handleOpenAdd}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xs transition-colors"
+          className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 text-[#ffdcc0]" />
           <span>Tambah Akun Baru</span>
         </button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 uppercase font-semibold text-[11px] tracking-wider">
+              <tr className="bg-[#f4f3f0] text-[#031633] border-b border-[#e3e2e0] uppercase font-bold text-[10px] tracking-wider">
                 <th className="py-3 px-4">Nama Lengkap</th>
                 <th className="py-3 px-4">Username</th>
                 <th className="py-3 px-4">Hak Akses (Role)</th>

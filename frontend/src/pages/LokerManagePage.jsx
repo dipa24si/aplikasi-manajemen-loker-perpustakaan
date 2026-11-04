@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import { lokerApi } from '../api';
@@ -11,7 +11,12 @@ import {
   Trash2, 
   AlertCircle,
   Wrench,
-  CheckCircle2
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Layers,
+  MapPin
 } from 'lucide-react';
 
 export default function LokerManagePage() {
@@ -19,6 +24,12 @@ export default function LokerManagePage() {
   const [lokers, setLokers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('semua');
+  const [selectedStatus, setSelectedStatus] = useState('semua');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,7 +45,7 @@ export default function LokerManagePage() {
   const fetchLokers = async () => {
     setLoading(true);
     try {
-      const res = await lokerApi.getAll({ search });
+      const res = await lokerApi.getAll();
       if (res.data) setLokers(res.data);
     } catch (err) {
       console.error(err);
@@ -45,7 +56,52 @@ export default function LokerManagePage() {
 
   useEffect(() => {
     fetchLokers();
-  }, [search]);
+  }, []);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedLocation, selectedStatus, pageSize]);
+
+  // Unique locations
+  const uniqueLocations = useMemo(() => {
+    const locs = lokers.map((l) => l.lokasi).filter(Boolean);
+    return Array.from(new Set(locs)).sort();
+  }, [lokers]);
+
+  // Filtered Lokers
+  const filteredLokers = useMemo(() => {
+    return lokers.filter((loker) => {
+      // 1. Search text
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const match =
+          loker.nomor.toLowerCase().includes(q) ||
+          (loker.lokasi && loker.lokasi.toLowerCase().includes(q)) ||
+          (loker.catatan && loker.catatan.toLowerCase().includes(q));
+        if (!match) return false;
+      }
+
+      // 2. Location
+      if (selectedLocation !== 'semua' && loker.lokasi !== selectedLocation) {
+        return false;
+      }
+
+      // 3. Status
+      if (selectedStatus === 'available' && loker.status !== 'kosong') return false;
+      if (selectedStatus === 'not_available' && loker.status === 'kosong') return false;
+      if (selectedStatus === 'rusak' && loker.status !== 'rusak') return false;
+      if (selectedStatus === 'terpakai' && loker.status !== 'terpakai') return false;
+
+      return true;
+    });
+  }, [lokers, search, selectedLocation, selectedStatus]);
+
+  // Pagination calculation
+  const totalItems = filteredLokers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const currentLokers = filteredLokers.slice(startIndex, startIndex + pageSize);
 
   const handleOpenAdd = () => {
     setEditingLoker(null);
@@ -103,88 +159,124 @@ export default function LokerManagePage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 font-hanken">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+          <h2 className="font-editorial text-2xl font-bold text-[#031633] tracking-tight">
             Master Data Loker
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Tambah nomor loker baru, atur ukuran, lokasi denah, dan pemeliharaan status rusak.
+          <p className="text-xs text-[#75777e] mt-0.5">
+            Total {lokers.length} loker terdaftar dalam sistem (Skala Kampus Universitas Riau).
           </p>
         </div>
 
         {isAdmin && (
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xs transition-colors"
+            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-[#ffdcc0]" />
             <span>Tambah Loker Baru</span>
           </button>
         )}
       </div>
 
-      {/* Search Input */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-xs">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Control Bar: Search & Filter Lokasi & Filter Status */}
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#75777e]" />
           <input
             type="text"
-            placeholder="Cari nomor loker, lokasi..."
+            placeholder="Cari nomor loker, lokasi penempatan, catatan..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            className="w-full pl-9 pr-3 py-2 text-xs bg-[#faf9f6] border border-[#c5c6ce] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] transition-all"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Dropdown Filter Lokasi */}
+          <select
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
+            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+          >
+            <option value="semua">📍 Semua Lokasi</option>
+            {uniqueLocations.map((loc) => (
+              <option key={loc} value={loc}>
+                📍 {loc}
+              </option>
+            ))}
+          </select>
+
+          {/* Filter Status */}
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+          >
+            <option value="semua">Semua Status</option>
+            <option value="available">🟢 Available (Siap)</option>
+            <option value="not_available">🔴 Not Available</option>
+            <option value="terpakai">⏳ Terpakai (Dipinjam)</option>
+            <option value="rusak">🔧 Perbaikan (Rusak)</option>
+          </select>
+
+          {/* Page Size */}
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-2.5 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+            title="Jumlah baris per halaman"
+          >
+            <option value={20}>20 baris</option>
+            <option value={50}>50 baris</option>
+            <option value={100}>100 baris</option>
+          </select>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 text-slate-500 border-b border-slate-200 uppercase font-semibold text-[11px] tracking-wider">
+              <tr className="bg-[#faf9f6] text-[#44474e] border-b border-[#e3e2e0] uppercase font-bold text-[11px] tracking-wider">
                 <th className="py-3 px-4">Nomor Loker</th>
-                <th className="py-3 px-4">Ukuran</th>
                 <th className="py-3 px-4">Lokasi Penempatan</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Catatan</th>
                 <th className="py-3 px-4 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-[#efeeeb] text-[#1a1c1a]">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-slate-400">
+                  <td colSpan="5" className="py-8 text-center text-[#75777e]">
                     Memuat daftar loker...
                   </td>
                 </tr>
-              ) : lokers.length === 0 ? (
+              ) : currentLokers.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-slate-400">
-                    Belum ada data loker. Silakan tambahkan loker baru.
+                  <td colSpan="5" className="py-8 text-center text-[#75777e]">
+                    Tidak ada loker yang sesuai dengan filter.
                   </td>
                 </tr>
               ) : (
-                lokers.map((loker) => (
-                  <tr key={loker.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-800 text-sm">
+                currentLokers.map((loker) => (
+                  <tr key={loker.id} className="hover:bg-[#faf9f6]/70 transition-colors">
+                    <td className="py-3 px-4 font-mono font-bold text-[#031633] text-sm">
                       {loker.nomor}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="uppercase text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-                        {loker.ukuran}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
+                    <td className="py-3 px-4 text-[#44474e] font-medium">
                       {loker.lokasi || '-'}
                     </td>
                     <td className="py-3 px-4">
                       <Badge status={loker.status} />
                     </td>
-                    <td className="py-3 px-4 text-slate-500">
+                    <td className="py-3 px-4 text-[#75777e]">
                       {loker.catatan || '-'}
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -194,10 +286,10 @@ export default function LokerManagePage() {
                           <button
                             onClick={() => handleToggleStatus(loker)}
                             title={loker.status === 'rusak' ? 'Tandai Siap' : 'Tandai Rusak'}
-                            className={`p-1.5 rounded-lg border text-xs ${
+                            className={`p-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
                               loker.status === 'rusak'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                : 'bg-[#ffdcc0]/50 text-[#6b3b00] border-[#ffdcc0] hover:bg-[#ffdcc0]'
                             }`}
                           >
                             {loker.status === 'rusak' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Wrench className="w-3.5 h-3.5" />}
@@ -209,7 +301,7 @@ export default function LokerManagePage() {
                             <button
                               onClick={() => handleOpenEdit(loker)}
                               title="Edit Loker"
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                              className="p-1.5 text-[#44474e] hover:text-[#031633] hover:bg-[#f4f3f0] rounded-lg border border-[#c5c6ce] transition-colors cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -217,7 +309,7 @@ export default function LokerManagePage() {
                               disabled={loker.status === 'terpakai'}
                               onClick={() => handleDelete(loker.id, loker.nomor)}
                               title={loker.status === 'terpakai' ? 'Loker sedang dipinjam' : 'Hapus Loker'}
-                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors disabled:opacity-30"
+                              className="p-1.5 text-[#44474e] hover:text-rose-700 hover:bg-rose-50 rounded-lg border border-[#c5c6ce] transition-colors disabled:opacity-30 cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -230,6 +322,63 @@ export default function LokerManagePage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Bar */}
+        <div className="p-3.5 bg-[#faf9f6] border-t border-[#e3e2e0] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#75777e]">
+          <div>
+            Menampilkan <span className="font-bold text-[#031633]">{totalItems > 0 ? startIndex + 1 : 0}</span> sampai{' '}
+            <span className="font-bold text-[#031633]">{Math.min(startIndex + pageSize, totalItems)}</span> dari{' '}
+            <span className="font-bold text-[#031633]">{totalItems}</span> loker
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-[#c5c6ce] bg-white text-[#031633] hover:bg-[#efeeeb] transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+              title="Halaman Sebelumnya"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                // Show first, last, current, and surrounding pages
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        currentPage === page
+                          ? 'bg-[#031633] text-white shadow-2xs'
+                          : 'bg-white border border-[#c5c6ce] text-[#44474e] hover:bg-[#efeeeb]'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                  return <span key={page} className="px-1 text-[#75777e]">...</span>;
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-[#c5c6ce] bg-white text-[#031633] hover:bg-[#efeeeb] transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+              title="Halaman Berikutnya"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -249,7 +398,7 @@ export default function LokerManagePage() {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1">
               Nomor / Kode Loker
             </label>
             <input
@@ -258,40 +407,25 @@ export default function LokerManagePage() {
               placeholder="Misal: A-01, B-12"
               value={formData.nomor}
               onChange={(e) => setFormData({ ...formData, nomor: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm font-mono text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Ukuran Loker
-            </label>
-            <select
-              value={formData.ukuran}
-              onChange={(e) => setFormData({ ...formData, ukuran: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800"
-            >
-              <option value="kecil">Kecil (Tas selempang / Laptop)</option>
-              <option value="sedang">Sedang (Ransel standar)</option>
-              <option value="besar">Besar (Koper mini / Tas carrier)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1">
               Lokasi Penempatan
             </label>
             <input
               type="text"
-              placeholder="Misal: Lantai 1, Dekat Pintu Masuk"
+              placeholder="Misal: Lantai 1 - Sayap Kiri"
               value={formData.lokasi}
               onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1">
               Catatan
             </label>
             <input
@@ -299,14 +433,14 @@ export default function LokerManagePage() {
               placeholder="Catatan kondisi kunci..."
               value={formData.catatan}
               onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
             />
           </div>
 
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition-colors"
+              className="w-full bg-[#031633] hover:bg-[#1a2b49] text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-xs cursor-pointer"
             >
               {editingLoker ? 'Simpan Perubahan' : 'Tambahkan Loker'}
             </button>
@@ -316,4 +450,3 @@ export default function LokerManagePage() {
     </div>
   );
 }
-

@@ -74,11 +74,11 @@ export default function HistoryPage() {
         return;
       }
 
-      const headers = ['ID Peminjaman,Nomor Loker,Ukuran,ID Anggota,Nama Anggota,No HP,Tgl Pinjam,Batas Kembali,Tgl Kembali,Status,Denda,Petugas Pinjam,Petugas Kembali,Catatan'];
+      const headers = ['ID Peminjaman,Nomor Loker,Lokasi,ID Anggota,Nama Anggota,No HP,Tgl Pinjam,Batas Kembali,Tgl Kembali,Status,Denda,Petugas Pinjam,Petugas Kembali,Catatan'];
       const rows = dataToExport.map((row) => [
         row.id,
         `"${row.nomor_loker}"`,
-        `"${row.ukuran_loker}"`,
+        `"${row.lokasi_loker || ''}"`,
         `"${row.member_id}"`,
         `"${row.member_name || ''}"`,
         `"${row.member_phone || ''}"`,
@@ -141,12 +141,12 @@ export default function HistoryPage() {
       </div>
 
       {/* Header & Action Bar Web (Disembunyikan saat cetak) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden font-hanken">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+          <h2 className="font-editorial text-2xl font-bold text-[#031633] tracking-tight">
             Riwayat & Laporan Peminjaman
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-[#75777e] mt-0.5">
             Laporan lengkap seluruh transaksi peminjaman, pengembalian, status kunci hilang, dan denda.
           </p>
         </div>
@@ -154,23 +154,23 @@ export default function HistoryPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium py-2 px-3.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 bg-white hover:bg-[#faf9f6] text-[#1a1c1a] border border-[#c5c6ce] text-xs font-semibold py-2 px-3.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
           >
-            <Download className="w-4 h-4 text-slate-500" />
+            <Download className="w-4 h-4 text-[#75777e]" />
             <span>Ekspor CSV</span>
           </button>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-3.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2 px-3.5 rounded-xl transition-all shadow-2xs cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-4 h-4 text-[#ffdcc0]" />
             <span>Cetak Laporan</span>
           </button>
         </div>
       </div>
 
       {/* Filter Card Web (Disembunyikan saat cetak) */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs print:hidden space-y-3">
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] p-4 shadow-2xs print:hidden space-y-3 font-hanken">
         <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -233,11 +233,11 @@ export default function HistoryPage() {
       </div>
 
       {/* History Table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden print:border-none print:shadow-none">
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] shadow-2xs overflow-hidden print:border-none print:shadow-none font-hanken">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse print:text-[10pt]">
             <thead>
-              <tr className="bg-slate-50/80 text-slate-600 border-b border-slate-200 uppercase font-semibold text-[11px] tracking-wider print:bg-slate-100 print:border-black">
+              <tr className="bg-[#f4f3f0] text-[#031633] border-b border-[#e3e2e0] uppercase font-bold text-[10px] tracking-wider print:bg-slate-100 print:border-black">
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Loker</th>
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Peminjam</th>
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Waktu Pinjam</th>
@@ -265,9 +265,11 @@ export default function HistoryPage() {
                   <tr key={row.id} className="hover:bg-slate-50/70 transition-colors print:border-b print:border-slate-300">
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-800 print:py-1.5 print:px-2">
                       {row.nomor_loker}
-                      <span className="block text-[10px] font-sans font-normal text-slate-400 uppercase print:text-slate-600">
-                        {row.lokasi_loker || row.ukuran_loker}
-                      </span>
+                      {row.lokasi_loker && (
+                        <span className="block text-[10px] font-sans font-normal text-slate-400 uppercase print:text-slate-600">
+                          {row.lokasi_loker}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2">
                       <p className="font-semibold text-slate-800">{row.member_name || row.member_id}</p>

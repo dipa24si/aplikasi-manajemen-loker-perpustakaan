@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../common/Modal';
 import { anggotaApi, peminjamanApi } from '../../api';
 import { Search, UserCheck, AlertCircle, KeyRound, Clock, ShieldAlert } from 'lucide-react';
@@ -17,6 +17,17 @@ export default function QuickPinjamModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [catatan, setCatatan] = useState('');
+
+  // Group available lokers by location
+  const groupedAvailableLokers = useMemo(() => {
+    const groups = {};
+    availableLokers.forEach((lok) => {
+      const loc = lok.lokasi || 'Area Umum';
+      if (!groups[loc]) groups[loc] = [];
+      groups[loc].push(lok);
+    });
+    return groups;
+  }, [availableLokers]);
 
   useEffect(() => {
     if (loker) {
@@ -99,10 +110,10 @@ export default function QuickPinjamModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Form Peminjaman Loker"
+      title="Form Peminjaman Kunci Loker"
       maxWidth="max-w-lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 font-hanken">
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-xl flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -112,23 +123,27 @@ export default function QuickPinjamModal({
 
         {/* 1. Pilih Loker */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
             Pilih Loker
           </label>
           <select
             value={selectedLokerId}
             onChange={(e) => setSelectedLokerId(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-mono text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2.5 text-sm font-mono text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] cursor-pointer"
           >
             {loker ? (
               <option value={loker.id}>
-                Loker {loker.nomor} ({loker.ukuran}) - {loker.lokasi || 'Umum'}
+                Loker {loker.nomor} - {loker.lokasi || 'Umum'}
               </option>
             ) : (
-              availableLokers.map((lok) => (
-                <option key={lok.id} value={lok.id}>
-                  Loker {lok.nomor} ({lok.ukuran}) - {lok.lokasi || 'Umum'}
-                </option>
+              Object.entries(groupedAvailableLokers).map(([locName, list]) => (
+                <optgroup key={locName} label={`📍 ${locName} (${list.length} Available)`}>
+                  {list.map((lok) => (
+                    <option key={lok.id} value={lok.id}>
+                      Loker {lok.nomor}
+                    </option>
+                  ))}
+                </optgroup>
               ))
             )}
           </select>
@@ -136,12 +151,12 @@ export default function QuickPinjamModal({
 
         {/* 2. Cari Anggota (NIM / Nama / Scan Barcode) */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
             Cari / Scan Kartu Anggota (NIM / ID SLiMS)
           </label>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#75777e]" />
               <input
                 type="text"
                 placeholder="Scan kartu anggota atau ketik NIM/Nama..."
@@ -153,14 +168,14 @@ export default function QuickPinjamModal({
                     handleSearchMember();
                   }
                 }}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-[#faf9f6] border border-[#c5c6ce] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
               />
             </div>
             <button
               type="button"
               disabled={searching}
               onClick={() => handleSearchMember()}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-xl transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
             >
               {searching ? 'Cek...' : 'Cari'}
             </button>
@@ -169,24 +184,24 @@ export default function QuickPinjamModal({
 
         {/* Info Anggota Terpilih */}
         {member && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 flex items-start gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-700">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-950 flex items-start gap-3">
+            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800">
               <UserCheck className="w-5 h-5" />
             </div>
             <div className="space-y-0.5">
-              <p className="font-bold text-sm text-emerald-800">{member.member_name}</p>
-              <p className="text-emerald-700">ID / NIM: <span className="font-mono font-medium">{member.member_id}</span> ({member.member_type_id})</p>
-              {member.member_phone && <p className="text-emerald-600">No. HP: {member.member_phone}</p>}
+              <p className="font-bold text-sm text-emerald-900">{member.member_name}</p>
+              <p className="text-emerald-800">ID / NIM: <span className="font-mono font-medium">{member.member_id}</span> ({member.member_type_id})</p>
+              {member.member_phone && <p className="text-emerald-700">No. HP: {member.member_phone}</p>}
             </div>
           </div>
         )}
 
         {/* 3. Info Batas Waktu Otomatis (Jam 16:00 Tutup Perpus) */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5 text-amber-900 text-xs">
-          <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        <div className="bg-[#ffdcc0]/40 border border-[#ffdcc0] rounded-xl p-3 flex items-start gap-2.5 text-[#2d1600] text-xs">
+          <Clock className="w-4 h-4 text-[#8b500b] shrink-0 mt-0.5" />
           <div className="space-y-0.5">
-            <p className="font-bold">Batas Pengembalian: Hari Ini Pukul 16:00 WIB</p>
-            <p className="text-amber-800 leading-relaxed text-[11px]">
+            <p className="font-bold text-[#6b3b00]">Batas Pengembalian: Hari Ini Pukul 16:00 WIB</p>
+            <p className="text-[#8b500b] leading-relaxed text-[11px]">
               Perpustakaan tutup jam 4 sore. Kunci wajib dikembalikan sebelum jam 16:00 WIB. Keterlambatan dikenakan denda bertambah per hari (Rp 5.000 / hari).
             </p>
           </div>
@@ -194,15 +209,15 @@ export default function QuickPinjamModal({
 
         {/* 4. Catatan Opsional */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
             Catatan Tambahan (Opsional)
           </label>
           <input
             type="text"
-            placeholder="Misal: Titip helm, tas laptop..."
+            placeholder="Misal: Titip helm, ransel kuliah..."
             value={catatan}
             onChange={(e) => setCatatan(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
           />
         </div>
 
@@ -211,9 +226,9 @@ export default function QuickPinjamModal({
           <button
             type="submit"
             disabled={loading || !member}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-emerald-600/20 transition-all text-sm disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold py-2.5 px-4 rounded-xl shadow-xs transition-all text-xs disabled:opacity-50 cursor-pointer"
           >
-            <KeyRound className="w-4 h-4" />
+            <KeyRound className="w-4 h-4 text-[#ffdcc0]" />
             {loading ? 'Memproses Peminjaman...' : 'Konfirmasi Pinjam Loker'}
           </button>
         </div>

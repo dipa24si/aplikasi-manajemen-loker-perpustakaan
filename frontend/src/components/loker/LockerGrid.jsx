@@ -178,7 +178,7 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                 {lokersInLoc.map((loker) => (
                   <LockerCard key={loker.id} loker={loker} onSelect={onSelectLoker} />
                 ))}
@@ -188,7 +188,7 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
         </div>
       ) : (
         /* TAMPILAN GRID BIASA */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
           {filteredLokers.map((loker) => (
             <LockerCard key={loker.id} loker={loker} onSelect={onSelectLoker} />
           ))}

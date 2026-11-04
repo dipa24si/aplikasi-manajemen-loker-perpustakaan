@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import BarcodeScannerInput from '../components/transaksi/BarcodeScannerInput';
 import Modal from '../components/common/Modal';
 import { peminjamanApi, lokerApi } from '../api';
@@ -25,6 +25,7 @@ export default function TransaksiPage() {
   // Modal Cetak Label QR Kunci
   const [isPrintLabelsOpen, setIsPrintLabelsOpen] = useState(false);
   const [allLokers, setAllLokers] = useState([]);
+  const [printLocationFilter, setPrintLocationFilter] = useState('semua');
 
   const inputRef = useRef(null);
 
@@ -40,6 +41,16 @@ export default function TransaksiPage() {
   useEffect(() => {
     fetchLokers();
   }, []);
+
+  const uniqueLocations = useMemo(() => {
+    const locs = allLokers.map((l) => l.lokasi).filter(Boolean);
+    return Array.from(new Set(locs)).sort();
+  }, [allLokers]);
+
+  const printableLokers = useMemo(() => {
+    if (printLocationFilter === 'semua') return allLokers;
+    return allLokers.filter((l) => l.lokasi === printLocationFilter);
+  }, [allLokers, printLocationFilter]);
 
   // Saat Petugas Scan QR Code yang Ada di Kunci Loker
   const handleScanKeyQR = async (scannedText) => {
@@ -164,23 +175,23 @@ export default function TransaksiPage() {
       )}
 
       {/* DAFTAR LOKER YANG SEDANG DIGUNAKAN (MENUNGGU PENGEMBALIAN KUNCI) */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="bg-white rounded-3xl border border-[#e3e2e0] p-6 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between border-b border-[#efeeeb] pb-3">
           <div>
-            <h3 className="font-bold text-base text-slate-800">
+            <h3 className="font-editorial text-lg font-bold text-[#031633]">
               Loker Sedang Terpakai (Menunggu Kunci Kembali)
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[#75777e]">
               Kunci wajib dikembalikan sebelum jam 16:00 WIB. Denda bertambah jika lewat beberapa hari.
             </p>
           </div>
-          <span className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full">
+          <span className="text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full">
             {allLokers.filter((l) => l.status !== 'kosong').length} Kunci di Luar
           </span>
         </div>
 
         {allLokers.filter((l) => l.peminjaman_aktif_id || (l.status === 'terpakai' && l.member_id)).length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs">
+          <div className="py-8 text-center text-[#75777e] text-xs">
             🎉 Semua kunci telah dikembalikan! Semua loker saat ini berstatus <b>Available</b>.
           </div>
         ) : (
@@ -196,24 +207,24 @@ export default function TransaksiPage() {
                     key={loker.id}
                     className={`border rounded-2xl p-4 flex items-center justify-between transition-colors ${
                       late
-                        ? 'bg-rose-50/60 border-rose-200 hover:border-rose-300'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        ? 'bg-rose-50/60 border-rose-300 hover:border-rose-400'
+                        : 'bg-[#faf9f6] border-[#e3e2e0] hover:border-[#c5c6ce]'
                     }`}
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-lg text-slate-800">
+                        <span className="font-mono font-black text-lg text-[#031633]">
                           {loker.nomor}
                         </span>
-                        <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-rose-800 bg-rose-100/80 border border-rose-300 px-2 py-0.5 rounded-full">
                           Not Available
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 font-medium">
-                        Peminjam: <b className="text-slate-800">{loker.member_name || loker.member_id || 'Mahasiswa'}</b>
+                      <p className="text-xs text-[#44474e] font-medium">
+                        Peminjam: <b className="text-[#031633]">{loker.member_name || loker.member_id || 'Mahasiswa'}</b>
                       </p>
-                      <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
+                      <p className="text-[11px] text-[#75777e] flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-[#8b500b]" />
                         {loker.lokasi}
                       </p>
 
@@ -230,9 +241,9 @@ export default function TransaksiPage() {
                     {/* Tombol Terima Kunci Langsung */}
                     <button
                       onClick={() => handleScanKeyQR(loker.nomor)}
-                      className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer shrink-0"
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 bg-[#031633] hover:bg-[#1a2b49] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <RotateCcw className="w-3.5 h-3.5 text-[#ffdcc0]" />
                       <span>Terima Kunci</span>
                     </button>
                   </div>
@@ -247,40 +258,59 @@ export default function TransaksiPage() {
         isOpen={isPrintLabelsOpen}
         onClose={() => setIsPrintLabelsOpen(false)}
         title="Cetak Stiker QR Code Gantungan Kunci Loker"
-        maxWidth="max-w-3xl"
+        maxWidth="max-w-4xl"
       >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-500">
-            Cetak lembar label ini untuk digunting dan ditempelkan pada gantungan kunci fisik setiap loker. Petugas cukup scan QR ini saat menerima kunci kembali.
+        <div className="space-y-4 font-hanken">
+          <p className="text-xs text-[#75777e]">
+            Cetak lembar stiker QR code ini untuk ditempelkan pada gantungan kunci fisik. Petugas cukup scan QR ini dengan barcode scanner USB / webcam saat menerima kunci kembali.
           </p>
 
-          <div className="flex justify-end gap-2 print:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 print:hidden bg-[#faf9f6] p-3 rounded-xl border border-[#e3e2e0]">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-[#44474e]">Pilih Zona / Lantai:</span>
+              <select
+                value={printLocationFilter}
+                onChange={(e) => setPrintLocationFilter(e.target.value)}
+                className="text-xs font-semibold bg-white border border-[#c5c6ce] rounded-lg px-3 py-1.5 text-[#031633] focus:outline-hidden cursor-pointer"
+              >
+                <option value="semua">Semua Lokasi ({allLokers.length} Kunci)</option>
+                {uniqueLocations.map((loc) => {
+                  const countInLoc = allLokers.filter((l) => l.lokasi === loc).length;
+                  return (
+                    <option key={loc} value={loc}>
+                      {loc} ({countInLoc} Kunci)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
             <button
               onClick={() => window.print()}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-colors"
             >
-              <Printer className="w-4 h-4" />
-              <span>Cetak Sekarang</span>
+              <Printer className="w-4 h-4 text-[#ffdcc0]" />
+              <span>Cetak {printableLokers.length} Label Sekarang</span>
             </button>
           </div>
 
           {/* Grid Stiker QR Code Kunci */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 border rounded-2xl max-h-[60vh] overflow-y-auto">
-            {allLokers.map((loker) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3.5 p-4 bg-[#faf9f6] border border-[#e3e2e0] rounded-2xl max-h-[60vh] overflow-y-auto">
+            {printableLokers.map((loker) => (
               <div
                 key={loker.id}
-                className="bg-white border-2 border-slate-300 rounded-xl p-3 text-center space-y-1.5 shadow-2xs"
+                className="bg-white border-2 border-[#c5c6ce] rounded-xl p-3 text-center space-y-1.5 shadow-2xs hover:border-[#031633] transition-colors"
               >
-                <div className="font-mono font-black text-base text-slate-800">
+                <div className="font-mono font-black text-base text-[#031633]">
                   {loker.nomor}
                 </div>
                 <div className="flex justify-center p-1 bg-white">
                   <QRCodeSVG value={`LOKER:${loker.nomor}`} size={75} level="M" />
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono">
+                <div className="text-[10px] text-[#75777e] font-mono">
                   LOKER:{loker.nomor}
                 </div>
-                <div className="text-[9px] text-slate-500 truncate" title={loker.lokasi}>
+                <div className="text-[9px] text-[#44474e] truncate font-medium" title={loker.lokasi}>
                   {loker.lokasi || 'Perpus'}
                 </div>
               </div>
