@@ -1,32 +1,7 @@
 services:
   # -------------------------------------------------------------
-  # 1. DATABASE MYSQL 8.0
-  # -------------------------------------------------------------
-  mysql:
-    image: mysql:8.0
-    container_name: loker-db
-    restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: loker_db
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      # Otomatis inisialisasi database & seed 200 loker saat container pertama kali dibuat
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-    networks:
-      - loker-network
-
-  # -------------------------------------------------------------
-  # 2. BACKEND API (Express.js)
+  # 1. BACKEND API (Express.js)
+  # Terhubung ke Database Server Eksternal (172.16.9.8:3308)
   # -------------------------------------------------------------
   backend:
     build:
@@ -34,16 +9,14 @@ services:
       dockerfile: Dockerfile
     container_name: loker-backend
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
     environment:
       PORT: 5000
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: root
-      DB_PASS: rootpassword
-      DB_NAME: loker_db
+      # Konfigurasi Server Database Eksternal
+      DB_HOST: "172.16.9.8"
+      DB_PORT: 3308
+      DB_USER: "root"
+      DB_PASS: "rootpassword123"
+      DB_NAME: "locker_db"
       JWT_SECRET: super_secret_jwt_key_library_locker_2026
       JWT_EXPIRES_IN: 1d
       DENDA_PER_HARI: 5000
@@ -54,7 +27,8 @@ services:
       - loker-network
 
   # -------------------------------------------------------------
-  # 3. FRONTEND (React SPA + Nginx Reverse Proxy)
+  # 2. FRONTEND (React SPA + Nginx Reverse Proxy)
+  # Diarahkan ke port 1034 (http://172.16.9.6:1034)
   # -------------------------------------------------------------
   frontend:
     build:
@@ -65,20 +39,15 @@ services:
     depends_on:
       - backend
     ports:
-      # Akses aplikasi web melalui browser di http://localhost:3000
-      - "3000:80"
+      # Akses aplikasi web melalui browser di http://172.16.9.6:1034
+      - "1034:80"
     networks:
       - loker-network
 
 # -------------------------------------------------------------
-# VOLUMES & NETWORKS
+# NETWORKS
 # -------------------------------------------------------------
-volumes:
-  mysql_data:
-    name: loker_mysql_data
-
 networks:
   loker-network:
     name: loker_network
     driver: bridge
-

@@ -4,11 +4,11 @@
 -- Target: MySQL 8.x / MariaDB 10.5+
 -- =====================================================================
 
-CREATE DATABASE IF NOT EXISTS loker_db
+CREATE DATABASE IF NOT EXISTS locker_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE loker_db;
+USE locker_db;
 
 -- ---------------------------------------------------------------------
 -- 1. TABEL PETUGAS (Pengguna Sistem Loker)
