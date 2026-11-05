@@ -11,9 +11,10 @@ import {
   AlertCircle, 
   Key, 
   Printer, 
-  MapPin,
-  Clock,
-  AlertTriangle
+  MapPin, 
+  Clock, 
+  AlertTriangle,
+  Search
 } from 'lucide-react';
 
 export default function TransaksiPage() {
@@ -26,6 +27,8 @@ export default function TransaksiPage() {
   const [isPrintLabelsOpen, setIsPrintLabelsOpen] = useState(false);
   const [allLokers, setAllLokers] = useState([]);
   const [printLocationFilter, setPrintLocationFilter] = useState('semua');
+  const [labelSearchQuery, setLabelSearchQuery] = useState('');
+  const [selectedLokerIds, setSelectedLokerIds] = useState(new Set());
 
   const inputRef = useRef(null);
 
@@ -47,10 +50,59 @@ export default function TransaksiPage() {
     return Array.from(new Set(locs)).sort();
   }, [allLokers]);
 
-  const printableLokers = useMemo(() => {
-    if (printLocationFilter === 'semua') return allLokers;
-    return allLokers.filter((l) => l.lokasi === printLocationFilter);
-  }, [allLokers, printLocationFilter]);
+  // Loker yang tampil di daftar pemilihan modal (filter zona & pencarian nomor)
+  const modalFilteredLokers = useMemo(() => {
+    return allLokers.filter((l) => {
+      if (printLocationFilter !== 'semua' && l.lokasi !== printLocationFilter) {
+        return false;
+      }
+      if (labelSearchQuery.trim()) {
+        const q = labelSearchQuery.toLowerCase().trim();
+        const match =
+          l.nomor.toLowerCase().includes(q) ||
+          (l.lokasi && l.lokasi.toLowerCase().includes(q));
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [allLokers, printLocationFilter, labelSearchQuery]);
+
+  // Loker yang DIPILIH untuk dicetak
+  const lockersToPrint = useMemo(() => {
+    return allLokers.filter((l) => selectedLokerIds.has(l.id));
+  }, [allLokers, selectedLokerIds]);
+
+  const handleToggleLokerSelect = (id) => {
+    setSelectedLokerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllVisible = () => {
+    setSelectedLokerIds((prev) => {
+      const next = new Set(prev);
+      modalFilteredLokers.forEach((l) => next.add(l.id));
+      return next;
+    });
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedLokerIds(new Set());
+  };
+
+  const handlePrintSelected = () => {
+    if (selectedLokerIds.size === 0) {
+      alert('Pilih minimal 1 stiker loker yang ingin dicetak.');
+      return;
+    }
+    window.print();
+  };
 
   // Saat Petugas Scan QR Code yang Ada di Kunci Loker
   const handleScanKeyQR = async (scannedText) => {
@@ -258,64 +310,272 @@ export default function TransaksiPage() {
         isOpen={isPrintLabelsOpen}
         onClose={() => setIsPrintLabelsOpen(false)}
         title="Cetak Stiker QR Code Gantungan Kunci Loker"
-        maxWidth="max-w-4xl"
+        maxWidth="max-w-5xl"
       >
         <div className="space-y-4 font-hanken">
           <p className="text-xs text-[#75777e]">
-            Cetak lembar stiker QR code ini untuk ditempelkan pada gantungan kunci fisik. Petugas cukup scan QR ini dengan barcode scanner USB / webcam saat menerima kunci kembali.
+            Pilih 1 atau beberapa loker di bawah untuk mencetak stiker gantungan kunci fisik (misal jika stiker lama tergores/rusak saat dipegang mahasiswa).
           </p>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 print:hidden bg-[#faf9f6] p-3 rounded-xl border border-[#e3e2e0]">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#44474e]">Pilih Zona / Lantai:</span>
+          {/* Control Bar: Pencarian, Filter Zona, Status Pilihan & Tombol Cetak */}
+          <div className="bg-[#faf9f6] p-3.5 rounded-2xl border border-[#e3e2e0] space-y-3 print:hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Cari Nomor Loker */}
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#75777e]" />
+                <input
+                  type="text"
+                  placeholder="Cari nomor loker (misal: A-01, B-12)..."
+                  value={labelSearchQuery}
+                  onChange={(e) => setLabelSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#c5c6ce] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
+                />
+              </div>
+
+              {/* Filter Lokasi Zona */}
               <select
                 value={printLocationFilter}
                 onChange={(e) => setPrintLocationFilter(e.target.value)}
-                className="text-xs font-semibold bg-white border border-[#c5c6ce] rounded-lg px-3 py-1.5 text-[#031633] focus:outline-hidden cursor-pointer"
+                className="text-xs font-semibold bg-white border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden cursor-pointer"
               >
-                <option value="semua">Semua Lokasi ({allLokers.length} Kunci)</option>
+                <option value="semua">Semua Zona ({allLokers.length} Loker)</option>
                 {uniqueLocations.map((loc) => {
                   const countInLoc = allLokers.filter((l) => l.lokasi === loc).length;
                   return (
                     <option key={loc} value={loc}>
-                      {loc} ({countInLoc} Kunci)
+                      {loc} ({countInLoc} Loker)
                     </option>
                   );
                 })}
               </select>
+
+              {/* Tombol Cetak Terpilih */}
+              <button
+                onClick={handlePrintSelected}
+                disabled={selectedLokerIds.size === 0}
+                className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Printer className="w-4 h-4 text-[#ffdcc0]" />
+                <span>
+                  {selectedLokerIds.size > 0 
+                    ? `Cetak ${selectedLokerIds.size} Stiker Terpilih` 
+                    : 'Pilih Stiker Terlebih Dahulu'}
+                </span>
+              </button>
             </div>
 
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-colors"
-            >
-              <Printer className="w-4 h-4 text-[#ffdcc0]" />
-              <span>Cetak {printableLokers.length} Label Sekarang</span>
-            </button>
+            {/* Sub-bar: Status Pemilihan & Tombol Cepat */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#efeeeb] text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[#031633]">
+                  Terpilih: <b className="text-emerald-700 font-bold">{selectedLokerIds.size}</b> dari {modalFilteredLokers.length} loker
+                </span>
+                {selectedLokerIds.size > 0 && (
+                  <span className="text-[11px] text-[#75777e]">
+                    (Klik loker lagi untuk membatalkan)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAllVisible}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-[#c5c6ce] text-[#031633] hover:bg-[#efeeeb] transition-colors cursor-pointer"
+                >
+                  ✓ Pilih Semua ({modalFilteredLokers.length})
+                </button>
+                {selectedLokerIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDeselectAll}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-[#c5c6ce] text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                  >
+                    ✕ Kosongkan Pilihan
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Grid Stiker QR Code Kunci */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3.5 p-4 bg-[#faf9f6] border border-[#e3e2e0] rounded-2xl max-h-[60vh] overflow-y-auto">
-            {printableLokers.map((loker) => (
-              <div
-                key={loker.id}
-                className="bg-white border-2 border-[#c5c6ce] rounded-xl p-3 text-center space-y-1.5 shadow-2xs hover:border-[#031633] transition-colors"
-              >
-                <div className="font-mono font-black text-base text-[#031633]">
-                  {loker.nomor}
-                </div>
-                <div className="flex justify-center p-1 bg-white">
-                  <QRCodeSVG value={`LOKER:${loker.nomor}`} size={75} level="M" />
-                </div>
-                <div className="text-[10px] text-[#75777e] font-mono">
-                  LOKER:{loker.nomor}
-                </div>
-                <div className="text-[9px] text-[#44474e] truncate font-medium" title={loker.lokasi}>
-                  {loker.lokasi || 'Perpus'}
-                </div>
+          {/* Interactive Selection Grid (Tampil di Layar Modal - Model Kartu ATM) */}
+          <div className="print:hidden">
+            {modalFilteredLokers.length === 0 ? (
+              <div className="p-8 text-center text-xs text-[#75777e] bg-[#faf9f6] rounded-2xl border border-[#e3e2e0]">
+                Tidak ada nomor loker yang sesuai dengan pencarian atau filter.
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 max-h-[55vh] overflow-y-auto p-1.5">
+                {modalFilteredLokers.map((loker) => {
+                  const isSelected = selectedLokerIds.has(loker.id);
+                  return (
+                    <div
+                      key={loker.id}
+                      onClick={() => handleToggleLokerSelect(loker.id)}
+                      className={`relative rounded-2xl p-3.5 transition-all cursor-pointer select-none border-2 flex flex-col justify-between min-h-[148px] ${
+                        isSelected
+                          ? 'bg-emerald-50/70 border-emerald-600 shadow-md ring-2 ring-emerald-600/30'
+                          : 'bg-white border-[#c5c6ce] hover:border-[#031633] hover:shadow-2xs opacity-90 hover:opacity-100'
+                      }`}
+                    >
+                      {/* Checkbox Indicator di pojok kanan atas */}
+                      <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-white/90 border border-neutral-300 text-neutral-600">
+                          Kartu Kunci
+                        </span>
+                        <div
+                          className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black transition-colors ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'border-2 border-[#c5c6ce] bg-white'
+                          }`}
+                        >
+                          {isSelected && '✓'}
+                        </div>
+                      </div>
+
+                      {/* Header Kartu: Logo UNRI & Nama Kampus */}
+                      <div className="flex items-center gap-2 border-b border-neutral-200 pb-1.5 pr-20">
+                        <img 
+                          src="/logo.png" 
+                          alt="Logo UNRI" 
+                          className="w-7 h-7 object-contain shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-black text-[11px] uppercase tracking-wider text-[#031633] leading-none truncate">
+                            UNIVERSITAS RIAU
+                          </h4>
+                          <p className="text-[8px] font-bold text-neutral-500 uppercase tracking-widest mt-0.5 leading-none">
+                            UPT PERPUSTAKAAN
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Body Kartu: Nomor Loker di Kiri, QR Code di Kanan */}
+                      <div className="flex items-center justify-between gap-2 py-1.5">
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-500 block">
+                            NOMOR LOKER
+                          </span>
+                          <div className="text-3xl font-black font-mono text-[#031633] tracking-tight leading-none">
+                            {loker.nomor}
+                          </div>
+                          <div className="text-[10px] font-semibold text-neutral-700 truncate pt-0.5 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-[#8b500b] shrink-0" />
+                            <span className="truncate">{loker.lokasi || 'Perpustakaan'}</span>
+                          </div>
+                        </div>
+
+                        {/* Indikator Lubang Ring Gantungan */}
+                        <div 
+                          className="w-4 h-4 rounded-full border border-dashed border-neutral-400 flex items-center justify-center text-[8px] text-neutral-400 shrink-0"
+                          title="Posisi lubang ring gantungan kunci"
+                        >
+                          ○
+                        </div>
+
+                        <div className="flex flex-col items-center justify-center shrink-0 pl-1.5 border-l border-dashed border-neutral-300">
+                          <div className="bg-white p-1 rounded-md border border-neutral-200">
+                            <QRCodeSVG value={`LOKER:${loker.nomor}`} size={56} level="M" />
+                          </div>
+                          <span className="text-[8px] text-neutral-500 font-mono font-bold mt-0.5">
+                            LOKER:{loker.nomor}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Footer Kartu */}
+                      <div className="border-t border-neutral-200 pt-1 flex justify-between items-center text-[8px] text-neutral-500">
+                        <span>Wajib kembali pkl 16:00 WIB</span>
+                        <span>Milik Perpustakaan UNRI</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+
+          {/* ========================================================
+              AREA KHUSUS CETAK (BENTUK KARTU ATM UNRI - HANYA TERPILIH)
+              ======================================================== */}
+          {lockersToPrint.length > 0 && (
+            <div id="qr-labels-sheet" className="hidden print:grid">
+              {lockersToPrint.map((loker) => (
+                <div key={loker.id} className="atm-key-card">
+                  {/* Header Kartu: Logo UNRI & Nama Kampus */}
+                  <div className="flex items-center justify-between border-b-2 border-black pb-1">
+                    <div className="flex items-center gap-1.5">
+                      <img 
+                        src="/logo.png" 
+                        alt="Logo UNRI" 
+                        className="w-6 h-6 object-contain shrink-0"
+                      />
+                      <div>
+                        <h4 className="font-black text-[9.5px] uppercase tracking-wider text-black leading-tight">
+                          UNIVERSITAS RIAU
+                        </h4>
+                        <p className="text-[7.5px] font-bold text-neutral-800 uppercase tracking-widest leading-none">
+                          UPT PERPUSTAKAAN
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <span className="px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border border-black bg-white">
+                      KARTU KUNCI LOKER
+                    </span>
+                  </div>
+
+                  {/* Body Kartu: Nomor Loker & QR Code */}
+                  <div className="flex items-center justify-between gap-2 my-auto py-1">
+                    {/* Kiri: Nomor Loker & Lokasi */}
+                    <div className="flex-1 space-y-0.5">
+                      <span className="text-[7.5px] font-bold uppercase tracking-wider text-neutral-600 block">
+                        NOMOR LOKER
+                      </span>
+                      <div className="text-3xl font-black font-mono text-black leading-none tracking-tight">
+                        {loker.nomor}
+                      </div>
+                      <div className="text-[8.5px] font-bold text-black truncate pt-0.5">
+                        📍 {loker.lokasi || 'Perpustakaan'}
+                      </div>
+                      <div className="text-[7px] text-neutral-800 leading-tight pt-0.5 font-medium">
+                        • Kembali sebelum pkl 16:00 WIB<br />
+                        • Denda telat Rp 5.000 / hari
+                      </div>
+                    </div>
+
+                    {/* Indikator Lubang Ring Gantungan */}
+                    <div 
+                      className="w-3.5 h-3.5 rounded-full border border-dashed border-neutral-500 flex items-center justify-center text-[6px] text-neutral-500 shrink-0 mx-0.5"
+                      title="Posisi lubang ring gantungan kunci"
+                    >
+                      ○
+                    </div>
+
+                    {/* Kanan: QR Code */}
+                    <div className="flex flex-col items-center justify-center shrink-0 pl-1.5 border-l border-dashed border-black">
+                      <div className="p-0.5 bg-white">
+                        <QRCodeSVG value={`LOKER:${loker.nomor}`} size={62} level="M" />
+                      </div>
+                      <span className="text-[7.5px] font-mono font-black text-black mt-0.5">
+                        LOKER:{loker.nomor}
+                      </span>
+                      <span className="text-[6.5px] text-neutral-700 font-sans">
+                        Scan saat kembali
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Footer Kartu */}
+                  <div className="border-t border-black pt-0.5 flex justify-between items-center text-[6.5px] text-neutral-800 font-medium">
+                    <span>Milik Perpustakaan UNRI</span>
+                    <span>Kampus Bina Widya Km 12.5 Pekanbaru</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

@@ -37,7 +37,7 @@ export default function Navbar() {
           />
           <div>
             <h1 className="font-editorial text-lg font-bold text-[#031633] leading-tight">
-              Pustaka <span className="text-[#8b500b]">UNRI</span>
+              Perpustakaan <span className="text-[#8b500b]">UNRI</span>
             </h1>
             <p className="text-[11px] text-[#75777e] font-medium">Sistem Manajemen Loker Mahasiswa</p>
           </div>
