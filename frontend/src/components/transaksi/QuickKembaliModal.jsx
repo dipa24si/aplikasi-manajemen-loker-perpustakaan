@@ -17,12 +17,11 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
 
   useEffect(() => {
     if (isOpen && loker) {
-      let initialDenda = infoDenda.totalDenda;
-      if (isKeyLost) initialDenda += 25000;
-      setDenda(initialDenda);
-      if (overdue) {
-        setCatatan(`Terlambat ${infoDenda.hariTerlambat} hari melewati jam 16:00.`);
+      if (isKeyLost) {
+        setDenda(25000);
+        setCatatan('Kunci hilang dilaporkan mahasiswa.');
       } else {
+        setDenda(0);
         setCatatan('');
       }
     }
@@ -33,13 +32,12 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
   const handleKeyLostToggle = (e) => {
     const checked = e.target.checked;
     setIsKeyLost(checked);
-    const baseDenda = infoDenda.totalDenda;
     if (checked) {
-      setDenda(baseDenda + 25000);
-      setCatatan('Kunci hilang dilaporkan.');
+      setDenda(25000);
+      setCatatan('Kunci hilang dilaporkan mahasiswa.');
     } else {
-      setDenda(baseDenda);
-      setCatatan(overdue ? `Terlambat ${infoDenda.hariTerlambat} hari melewati jam 16:00.` : '');
+      setDenda(0);
+      setCatatan('');
     }
   };
 
@@ -96,21 +94,21 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
           </div>
         </div>
 
-        {/* Warning Overdue & Denda Otomatis */}
-        {overdue ? (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3.5 rounded-xl space-y-1">
+        {/* Info Denda: Hanya Jika Kunci Hilang */}
+        {isKeyLost ? (
+          <div className="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-xl space-y-1">
             <div className="flex items-center gap-1.5 font-bold">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>Terlambat Melewati Jam Tutup (16:00 WIB)</span>
+              <span>Status: Kunci Hilang Dilaporkan</span>
             </div>
             <p className="text-rose-700 text-[11px] leading-relaxed">
-              Mahasiswa telat <b>{infoDenda.hariTerlambat} hari</b>. Denda otomatis bertambah <b>Rp 5.000 / hari</b>.
+              Mahasiswa melaporkan anak kunci loker hilang. Denda penggantian kunci dapat disesuaikan di bawah.
             </p>
           </div>
         ) : (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-medium">Dikembalikan tepat waktu sebelum jam 16:00 (Bebas Denda).</span>
+            <span className="font-medium">Kunci lengkap dikembalikan ke petugas (Bebas Denda).</span>
           </div>
         )}
 
@@ -125,7 +123,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
             />
             <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-800">
               <Key className="w-4 h-4 text-rose-500" />
-              <span>Laporkan Kunci Hilang (+ Rp 25.000)</span>
+              <span>Mahasiswa Melaporkan Kunci Hilang (+ Rp 25.000)</span>
             </div>
           </label>
         </div>

@@ -13,11 +13,11 @@ async function getStats(req, res, next) {
       FROM lokers
     `);
 
-    // 2. Hitung statistik Peminjaman (Aktif, Overdue, Selesai Hari Ini)
+    // 2. Hitung statistik Peminjaman (Aktif, Kunci Hilang, Selesai Hari Ini)
     const [pinjamStats] = await db.query(`
       SELECT
         SUM(CASE WHEN status = 'aktif' THEN 1 ELSE 0 END) AS aktif,
-        SUM(CASE WHEN status = 'aktif' AND batas_kembali IS NOT NULL AND batas_kembali < NOW() THEN 1 ELSE 0 END) AS terlambat,
+        0 AS terlambat,
         SUM(CASE WHEN status = 'selesai' AND DATE(tanggal_kembali) = CURDATE() THEN 1 ELSE 0 END) AS selesai_hari_ini,
         SUM(CASE WHEN status = 'kunci_hilang' THEN 1 ELSE 0 END) AS kunci_hilang
       FROM peminjaman
@@ -36,6 +36,8 @@ async function getStats(req, res, next) {
         l.ukuran AS ukuran_loker,
         COALESCE(a.member_name, p.member_id) AS nama_anggota,
         p.member_id,
+        COALESCE(a.fakultas, '-') AS fakultas,
+        COALESCE(a.prodi, '-') AS prodi,
         pt_pinjam.nama AS nama_petugas_pinjam,
         pt_kembali.nama AS nama_petugas_kembali
       FROM peminjaman p

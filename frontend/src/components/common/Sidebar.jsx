@@ -8,7 +8,7 @@ import {
   Package, 
   Users, 
   Sparkles,
-  Database
+  Monitor
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
@@ -20,12 +20,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       label: 'Dashboard & Grid',
       icon: LayoutGrid,
       desc: 'Denah loker & statistik'
-    },
-    {
-      id: 'kiosk',
-      label: 'Anjungan Mandiri (Kiosk)',
-      icon: CreditCard,
-      desc: 'Layar Tap KTM Mahasiswa'
     },
     {
       id: 'transaksi',
@@ -46,6 +40,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       desc: 'Master nomor & lokasi'
     },
     ...(isAdmin ? [
+      {
+        id: 'kiosks',
+        label: 'Kelola Kiosk',
+        icon: Monitor,
+        desc: 'Setup anjungan mandiri'
+      },
       {
         id: 'petugas',
         label: 'Kelola Petugas',
@@ -87,21 +87,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             </button>
           );
         })}
-      </div>
-
-      {/* SLiMS Integration Status Box */}
-      <div className="p-4 m-3 bg-[#f4f3f0] rounded-2xl border border-[#e3e2e0] text-xs">
-        <div className="flex items-center gap-2 text-[#031633] font-bold mb-1">
-          <Database className="w-4 h-4 text-[#8b500b]" />
-          <span>Integrasi SLiMS 9</span>
-        </div>
-        <p className="text-[#44474e] text-[11px] leading-relaxed">
-          Membaca data keanggotaan mahasiswa langsung dari server perpustakaan.
-        </p>
-        <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-[#6b3b00] font-bold bg-[#ffdcc0] border border-[#ffdcc0] px-2 py-0.5 rounded-full w-fit">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-          Available / Not Available Mode
-        </div>
       </div>
     </aside>
   );

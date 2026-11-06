@@ -1,7 +1,7 @@
 services:
   # -------------------------------------------------------------
   # 1. BACKEND API (Express.js)
-  # Terhubung ke Database Server Eksternal (172.16.9.8:3308)
+  # Terhubung ke Database Server Eksternal (172.16.9.8:24004)
   # -------------------------------------------------------------
   backend:
     build:
@@ -11,12 +11,12 @@ services:
     restart: unless-stopped
     environment:
       PORT: 5000
-      # Konfigurasi Server Database Eksternal
-      DB_HOST: "172.16.9.8"
-      DB_PORT: 3308
-      DB_USER: "root"
-      DB_PASS: "rootpassword123"
-      DB_NAME: "locker_db"
+      # Konfigurasi Server Database Eksternal (172.16.9.8:24004)
+      DB_HOST: "${DB_HOST:-172.16.9.8}"
+      DB_PORT: "${DB_PORT:-24004}"
+      DB_USER: "${DB_USER:-userloker}"
+      DB_PASS: "${DB_PASS:-userloker123}"
+      DB_NAME: "${DB_NAME:-loker_db}"
       JWT_SECRET: super_secret_jwt_key_library_locker_2026
       JWT_EXPIRES_IN: 1d
       DENDA_PER_HARI: 5000

@@ -14,10 +14,52 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Filter,
   Layers,
-  MapPin
+  MapPin,
+  Sparkles
 } from 'lucide-react';
+
+// Lokasi penempatan standar di perpustakaan
+const LOCATION_OPTIONS = [
+  'Lantai 1 - Sayap Kiri',
+  'Lantai 1 - Sayap Kanan',
+  'Sirkulasi'
+];
+
+/**
+ * Helper untuk mendeteksi nomor loker terakhir dan merekomendasikan nomor berikutnya
+ * Contoh: ['A-01', 'A-02', 'A-50'] -> { last: 'A-50', next: 'A-51' }
+ */
+function parseLockerNomor(nomorList) {
+  if (!nomorList || nomorList.length === 0) return { last: null, next: '' };
+
+  const sorted = [...nomorList].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
+
+  const last = sorted[sorted.length - 1];
+
+  const match = last.match(/^([A-Za-z]+)([-_ ]?)(\d+)$/);
+  if (match) {
+    const prefix = match[1];
+    const sep = match[2] || '-';
+    const numStr = match[3];
+    const nextNum = parseInt(numStr, 10) + 1;
+    const padded = String(nextNum).padStart(numStr.length, '0');
+    return { last, next: `${prefix}${sep}${padded}` };
+  }
+
+  const numMatch = last.match(/^(\d+)$/);
+  if (numMatch) {
+    const nextNum = parseInt(numMatch[1], 10) + 1;
+    const padded = String(nextNum).padStart(numMatch[1].length, '0');
+    return { last, next: padded };
+  }
+
+  return { last, next: '' };
+}
 
 export default function LokerManagePage() {
   const { isAdmin } = useAuth();
@@ -36,11 +78,32 @@ export default function LokerManagePage() {
   const [editingLoker, setEditingLoker] = useState(null);
   const [formData, setFormData] = useState({
     nomor: '',
-    lokasi: '',
+    lokasi: LOCATION_OPTIONS[0],
     ukuran: 'sedang',
     catatan: ''
   });
   const [modalError, setModalError] = useState('');
+
+  // Nomor loker terakhir & rekomendasi berikutnya berdasarkan lokasi yang dipilih di modal
+  const locationSuggestion = useMemo(() => {
+    const targetLoc = formData.lokasi || LOCATION_OPTIONS[0];
+    const nomorsInLoc = lokers
+      .filter((l) => l.lokasi === targetLoc)
+      .map((l) => l.nomor);
+
+    const parsed = parseLockerNomor(nomorsInLoc);
+
+    if (!parsed.next) {
+      const defaultPrefix = targetLoc.toLowerCase().includes('kiri') ? 'A' : 'B';
+      return { last: null, next: `${defaultPrefix}-01` };
+    }
+    return parsed;
+  }, [lokers, formData.lokasi]);
+
+  // Nomor loker terakhir secara global di seluruh sistem
+  const globalSuggestion = useMemo(() => {
+    return parseLockerNomor(lokers.map((l) => l.nomor));
+  }, [lokers]);
 
   const fetchLokers = async () => {
     setLoading(true);
@@ -105,7 +168,12 @@ export default function LokerManagePage() {
 
   const handleOpenAdd = () => {
     setEditingLoker(null);
-    setFormData({ nomor: '', lokasi: '', ukuran: 'sedang', catatan: '' });
+    setFormData({
+      nomor: '',
+      lokasi: LOCATION_OPTIONS[0],
+      ukuran: 'sedang',
+      catatan: ''
+    });
     setModalError('');
     setIsModalOpen(true);
   };
@@ -114,7 +182,7 @@ export default function LokerManagePage() {
     setEditingLoker(loker);
     setFormData({
       nomor: loker.nomor,
-      lokasi: loker.lokasi || '',
+      lokasi: loker.lokasi || LOCATION_OPTIONS[0],
       ukuran: loker.ukuran,
       catatan: loker.catatan || ''
     });
@@ -397,31 +465,96 @@ export default function LokerManagePage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1">
-              Nomor / Kode Loker
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Misal: A-01, B-12"
-              value={formData.nomor}
-              onChange={(e) => setFormData({ ...formData, nomor: e.target.value })}
-              className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm font-mono text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
-            />
-          </div>
-
+          {/* 1. Lokasi Penempatan (Dropdown 2 Area) */}
           <div>
             <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1">
               Lokasi Penempatan
             </label>
+            <div className="relative">
+              <select
+                required
+                value={formData.lokasi}
+                onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
+                className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] cursor-pointer appearance-none"
+              >
+                {LOCATION_OPTIONS.map((loc) => (
+                  <option key={loc} value={loc}>
+                    📍 {loc}
+                  </option>
+                ))}
+                {/* Opsi data lama jika sedang mengedit loker di luar 2 lokasi utama */}
+                {formData.lokasi && !LOCATION_OPTIONS.includes(formData.lokasi) && (
+                  <option value={formData.lokasi}>
+                    📍 {formData.lokasi}
+                  </option>
+                )}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[#75777e]">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-[11px] text-[#75777e] mt-1">
+              Pilih area lantai/sayap penempatan loker di perpustakaan.
+            </p>
+          </div>
+
+          {/* 2. Nomor / Kode Loker */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider">
+                Nomor / Kode Loker
+              </label>
+              {!editingLoker && locationSuggestion.next && (
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, nomor: locationSuggestion.next }))}
+                  className="text-[11px] text-[#8b500b] hover:text-[#6b3b00] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3 text-[#8b500b]" />
+                  <span>Gunakan {locationSuggestion.next}</span>
+                </button>
+              )}
+            </div>
+
             <input
               type="text"
-              placeholder="Misal: Lantai 1 - Sayap Kiri"
-              value={formData.lokasi}
-              onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
-              className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
+              required
+              placeholder={
+                locationSuggestion.last
+                  ? `Terakhir: ${locationSuggestion.last} (Contoh: ${locationSuggestion.next})`
+                  : globalSuggestion.last
+                  ? `Terakhir: ${globalSuggestion.last} (Contoh: ${globalSuggestion.next})`
+                  : 'Misal: A-01, B-01'
+              }
+              value={formData.nomor}
+              onChange={(e) => setFormData({ ...formData, nomor: e.target.value.toUpperCase() })}
+              className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-[#031633] placeholder:text-[#8b8d96] placeholder:font-normal focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
             />
+
+            {!editingLoker && (
+              <div className="mt-1.5 space-y-1 text-xs">
+                {locationSuggestion.last ? (
+                  <p className="text-[#5f6368] flex items-center gap-1.5 flex-wrap">
+                    <span>Loker terakhir di <strong>{formData.lokasi}</strong>:</span>
+                    <span className="font-mono font-bold text-[#031633] bg-[#efeeeb] px-1.5 py-0.5 rounded border border-[#e3e2e0]">
+                      {locationSuggestion.last}
+                    </span>
+                    <span className="text-[#8b500b] font-medium">
+                      (Rekomendasi berikutnya: <strong className="font-mono">{locationSuggestion.next}</strong>)
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[#5f6368]">
+                    Belum ada loker di area ini. Rekomendasi awal: <strong className="font-mono text-[#031633]">{locationSuggestion.next}</strong>
+                  </p>
+                )}
+                {globalSuggestion.last && globalSuggestion.last !== locationSuggestion.last && (
+                  <p className="text-[11px] text-[#75777e]">
+                    Info sistem: Loker nomor tertinggi keseluruhan yang terdaftar adalah <strong className="font-mono text-[#44474e]">{globalSuggestion.last}</strong>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

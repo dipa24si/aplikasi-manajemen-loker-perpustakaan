@@ -36,8 +36,8 @@ async function getHistory(req, res, next) {
     }
 
     if (search) {
-      whereClause += ' AND (l.nomor LIKE ? OR p.member_id LIKE ? OR a.member_name LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      whereClause += ' AND (l.nomor LIKE ? OR p.member_id LIKE ? OR a.member_name LIKE ? OR a.fakultas LIKE ? OR a.prodi LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     // Hitung total data
@@ -61,6 +61,8 @@ async function getHistory(req, res, next) {
         l.lokasi AS lokasi_loker,
         p.member_id,
         COALESCE(a.member_name, p.member_id) AS member_name,
+        COALESCE(a.fakultas, '-') AS fakultas,
+        COALESCE(a.prodi, '-') AS prodi,
         a.member_type_id,
         a.member_phone,
         p.tanggal_pinjam,

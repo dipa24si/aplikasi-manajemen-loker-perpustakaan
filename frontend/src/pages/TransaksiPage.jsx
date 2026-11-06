@@ -142,7 +142,7 @@ export default function TransaksiPage() {
             </div>
             <h2 className="font-editorial text-2xl sm:text-3xl font-bold">Scan QR Gantungan Kunci Loker</h2>
             <p className="text-xs text-[#d7e2ff] mt-1 max-w-lg">
-              Batas pengembalian harian pukul <b>16:00 WIB</b>. Keterlambatan dikenakan denda otomatis <b>Rp 5.000 / hari</b>.
+              Bebas batas waktu pinjam. Denda hanya berlaku jika kunci hilang (laporkan ke petugas perpustakaan).
             </p>
           </div>
 
@@ -197,13 +197,13 @@ export default function TransaksiPage() {
               </p>
             </div>
             <div>
-              <span className="text-slate-400">Denda Keterlambatan:</span>
+              <span className="text-slate-400">Denda Kunci Hilang:</span>
               {successInfo.denda > 0 ? (
                 <p className="font-bold text-rose-600 text-sm">
-                  {formatRupiah(successInfo.denda)} ({successInfo.hari_terlambat} hari telat)
+                  {formatRupiah(successInfo.denda)} (Ganti Rugi Kunci Hilang)
                 </p>
               ) : (
-                <p className="font-semibold text-emerald-700 text-sm">Bebas Denda (Tepat Waktu)</p>
+                <p className="font-semibold text-emerald-700 text-sm">Bebas Denda</p>
               )}
             </div>
           </div>
@@ -234,7 +234,7 @@ export default function TransaksiPage() {
               Loker Sedang Terpakai (Menunggu Kunci Kembali)
             </h3>
             <p className="text-xs text-[#75777e]">
-              Kunci wajib dikembalikan sebelum jam 16:00 WIB. Denda bertambah jika lewat beberapa hari.
+              Bebas batas waktu pinjam. Denda hanya dikenakan apabila kunci loker hilang (lapor ke petugas).
             </p>
           </div>
           <span className="text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full">
@@ -486,7 +486,7 @@ export default function TransaksiPage() {
 
                       {/* Footer Kartu */}
                       <div className="border-t border-neutral-200 pt-1 flex justify-between items-center text-[8px] text-neutral-500">
-                        <span>Wajib kembali pkl 16:00 WIB</span>
+                        <span>Bebas batas waktu pinjam</span>
                         <span>Milik Perpustakaan UNRI</span>
                       </div>
                     </div>
@@ -540,8 +540,8 @@ export default function TransaksiPage() {
                         📍 {loker.lokasi || 'Perpustakaan'}
                       </div>
                       <div className="text-[7px] text-neutral-800 leading-tight pt-0.5 font-medium">
-                        • Kembali sebelum pkl 16:00 WIB<br />
-                        • Denda telat Rp 5.000 / hari
+                        • Bebas batas waktu pinjam<br />
+                        • Denda hanya jika kunci hilang
                       </div>
                     </div>
 

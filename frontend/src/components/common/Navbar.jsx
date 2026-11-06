@@ -1,15 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Badge from './Badge';
-import { LogOut, User, Clock, Library } from 'lucide-react';
+import { LogOut, User, Clock, Library, Database } from 'lucide-react';
+import { healthApi } from '../../api';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const [time, setTime] = useState(new Date());
+  const [sqlStatus, setSqlStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Cek status koneksi Database SQL secara berkala
+  const checkDatabaseConnection = async () => {
+    try {
+      const res = await healthApi.check();
+      // Axios interceptor otomatis mengembalikan data langsung
+      const isConnected = Boolean(
+        res?.db === 'connected' || 
+        res?.status === 'ok' || 
+        res?.data?.db === 'connected'
+      );
+      if (isConnected) {
+        setSqlStatus('connected');
+      } else {
+        setSqlStatus('disconnected');
+      }
+    } catch (err) {
+      setSqlStatus('disconnected');
+    }
+  };
+
+  useEffect(() => {
+    checkDatabaseConnection();
+    const interval = setInterval(checkDatabaseConnection, 15000); // periksa setiap 15 detik
+    return () => clearInterval(interval);
   }, []);
 
   const formattedTime = time.toLocaleTimeString('id-ID', {
@@ -53,9 +81,51 @@ export default function Navbar() {
           <span className="text-[#75777e]">{formattedDate}</span>
         </div>
 
-        {/* User Info & Actions */}
+        {/* User Info & Actions & SQL Status */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2.5 pl-2">
+          {/* Status Koneksi SQL Database */}
+          {sqlStatus === 'connected' && (
+            <button
+              type="button"
+              onClick={checkDatabaseConnection}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/90 text-emerald-700 text-xs font-semibold shadow-2xs select-none transition-colors cursor-pointer"
+              title="Database MySQL/MariaDB Terhubung Sempurna. Klik untuk periksa ulang."
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <Database className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="font-bold text-[11px] tracking-wide">SQL Terhubung</span>
+            </button>
+          )}
+
+          {sqlStatus === 'disconnected' && (
+            <button
+              type="button"
+              onClick={checkDatabaseConnection}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 text-xs font-semibold shadow-2xs select-none animate-pulse transition-colors cursor-pointer"
+              title="Koneksi ke Database MySQL Terputus! Klik untuk periksa ulang."
+            >
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+              <Database className="w-3.5 h-3.5 text-rose-600" />
+              <span className="font-bold text-[11px] tracking-wide">SQL Terputus</span>
+            </button>
+          )}
+
+          {sqlStatus === 'checking' && (
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-100 border border-stone-200 text-stone-500 text-xs font-medium shadow-2xs select-none"
+            >
+              <span className="w-2 h-2 rounded-full bg-stone-400 animate-pulse"></span>
+              <Database className="w-3.5 h-3.5 text-stone-400" />
+              <span className="text-[11px]">Memeriksa SQL...</span>
+            </div>
+          )}
+
+          <div className="h-6 w-px bg-[#e9e8e5] hidden sm:block"></div>
+
+          <div className="flex items-center gap-2.5 pl-1">
             <div className="w-8 h-8 rounded-full bg-[#031633] text-white flex items-center justify-center font-bold text-xs shadow-xs">
               {user?.nama ? user.nama.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
             </div>

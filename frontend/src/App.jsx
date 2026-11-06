@@ -9,11 +9,32 @@ import TransaksiPage from './pages/TransaksiPage';
 import HistoryPage from './pages/HistoryPage';
 import LokerManagePage from './pages/LokerManagePage';
 import PetugasPage from './pages/PetugasPage';
+import KioskManagePage from './pages/KioskManagePage';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
   const { isAuthenticated, loading, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Deteksi apakah rute adalah halaman Kiosk Mandiri (misal: /sirkulasi, /sayap-kiri, /sayap-kanan, /kiosk)
+  const path = window.location.pathname.toLowerCase().replace(/^\/+|\/+$/g, '');
+  const segments = path.split('/');
+  const firstSegment = segments[0] || '';
+  const secondSegment = segments[1] || '';
+
+  const ADMIN_ROUTES = ['login', 'dashboard', 'admin', 'transaksi', 'history', 'lokers', 'petugas', 'kiosks'];
+
+  // Jika URL adalah /kiosk atau rute tempat kustom seperti /sirkulasi, /sayap-kiri, dll.
+  const isKioskRoute =
+    firstSegment === 'kiosk' ||
+    (firstSegment !== '' && !ADMIN_ROUTES.includes(firstSegment));
+
+  const kioskSlug = firstSegment === 'kiosk' ? secondSegment : firstSegment;
+
+  // Halaman Kiosk Mandiri Standalone (tidak perlu login admin, layar penuh kebiruan)
+  if (isKioskRoute) {
+    return <KioskPage standalone={true} tempatSlug={kioskSlug} />;
+  }
 
   if (loading) {
     return (
@@ -37,10 +58,10 @@ function AppContent() {
 
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           {activeTab === 'dashboard' && <DashboardPage />}
-          {activeTab === 'kiosk' && <KioskPage />}
           {activeTab === 'transaksi' && <TransaksiPage />}
           {activeTab === 'history' && <HistoryPage />}
           {activeTab === 'lokers' && <LokerManagePage />}
+          {activeTab === 'kiosks' && isAdmin && <KioskManagePage />}
           {activeTab === 'petugas' && isAdmin && <PetugasPage />}
         </main>
       </div>

@@ -42,31 +42,12 @@ export function formatRupiah(amount) {
 }
 
 /**
- * Cek apakah peminjaman sudah melewati batas jam 16:00
+ * Kebijakan Baru: Bebas Batas Waktu Pinjam & Denda Hanya Kunci Hilang
  */
 export function isOverdue(batasKembali, status) {
-  if (status !== 'aktif' || !batasKembali) return false;
-  return new Date(batasKembali).getTime() < new Date().getTime();
+  return false;
 }
 
-/**
- * Hitung Denda Keterlambatan Otomatis (Rp 5.000 / hari jika lewat jam 16:00)
- */
-export function hitungDenda(batasKembali, tarifPerHari = 5000) {
-  if (!batasKembali) return { hariTerlambat: 0, totalDenda: 0 };
-  const batas = new Date(batasKembali);
-  const now = new Date();
-
-  if (now <= batas) {
-    return { hariTerlambat: 0, totalDenda: 0 };
-  }
-
-  const selisihMs = now.getTime() - batas.getTime();
-  const satuHariMs = 24 * 60 * 60 * 1000;
-  const hariTerlambat = Math.max(1, Math.ceil(selisihMs / satuHariMs));
-
-  return {
-    hariTerlambat,
-    totalDenda: hariTerlambat * tarifPerHari
-  };
+export function hitungDenda(batasKembali, tarifPerHari = 0) {
+  return { hariTerlambat: 0, totalDenda: 0 };
 }

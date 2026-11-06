@@ -83,15 +83,15 @@ export default function PrintTicketModal({ isOpen, onClose, ticketData }) {
               
               <div className="border-t border-dashed border-black pt-1.5 mt-1.5 flex justify-between items-center font-bold">
                 <span className="text-black">Batas Kembali:</span>
-                <span className="text-black font-black">Hari ini, Maks 16:00 WIB</span>
+                <span className="text-black font-bold">Bebas (Tidak ada batas waktu)</span>
               </div>
             </div>
 
-            {/* Peraturan Denda & Jam Tutup (Persis seperti di foto) */}
+            {/* Peraturan Kunci Hilang */}
             <div className="mt-2.5 border border-black rounded-lg p-2 bg-white text-[10px] text-black font-sans font-semibold leading-tight">
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-black shrink-0" />
-                <span>Perpus tutup jam 16:00 WIB. Denda telat Rp 5.000 / hari.</span>
+                <span>Jika kunci hilang harap lapor ke petugas. Denda hanya berlaku jika kunci hilang.</span>
               </div>
             </div>
 

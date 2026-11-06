@@ -21,6 +21,8 @@ async function getAllLokers(req, res, next) {
         p.batas_kembali,
         p.catatan AS catatan_pinjam,
         COALESCE(a.member_name, p.member_id) AS member_name,
+        COALESCE(a.fakultas, '-') AS fakultas,
+        COALESCE(a.prodi, '-') AS prodi,
         a.member_type_id,
         a.member_phone,
         pt.nama AS nama_petugas
@@ -74,6 +76,8 @@ async function getLokerById(req, res, next) {
         p.tanggal_pinjam,
         p.batas_kembali,
         COALESCE(a.member_name, p.member_id) AS member_name,
+        COALESCE(a.fakultas, '-') AS fakultas,
+        COALESCE(a.prodi, '-') AS prodi,
         a.member_type_id,
         a.member_phone
       FROM lokers l

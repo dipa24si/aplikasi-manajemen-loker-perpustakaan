@@ -41,3 +41,15 @@ export const petugasApi = {
   update: (id, data) => api.put(`/petugas/${id}`, data),
   delete: (id) => api.delete(`/petugas/${id}`)
 };
+
+export const kioskApi = {
+  getAll: () => api.get('/kiosks'),
+  getBySlug: (slug) => api.get(`/kiosks/slug/${slug}`),
+  create: (data) => api.post('/kiosks', data),
+  update: (id, data) => api.put(`/kiosks/${id}`, data),
+  delete: (id) => api.delete(`/kiosks/${id}`)
+};
+
+export const healthApi = {
+  check: () => api.get('/health')
+};

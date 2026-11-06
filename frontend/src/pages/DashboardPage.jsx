@@ -125,7 +125,7 @@ export default function DashboardPage() {
         <StatCard
           title="Kunci Belum Kembali"
           value={stats?.peminjaman?.aktif || 0}
-          subtitle={`${stats?.peminjaman?.terlambat || 0} lewat batas jam`}
+          subtitle={`${stats?.peminjaman?.kunci_hilang || 0} kunci hilang dilaporkan`}
           icon={AlertTriangle}
           color="amber"
         />

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Badge from '../components/common/Badge';
 import { historyApi } from '../api';
 import { formatDate, formatRupiah } from '../utils/formatters';
+import * as XLSX from 'xlsx';
 import { 
   Search, 
   Filter, 
@@ -11,7 +12,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   FileText,
-  DollarSign
+  DollarSign,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export default function HistoryPage() {
@@ -57,8 +59,8 @@ export default function HistoryPage() {
     fetchHistory(1);
   };
 
-  // Export ke file CSV
-  const handleExportCSV = async () => {
+  // Export langsung ke file Excel (.xlsx) dengan SheetJS
+  const handleExportExcel = async () => {
     try {
       const res = await historyApi.getHistory({
         status,
@@ -70,38 +72,56 @@ export default function HistoryPage() {
 
       const dataToExport = res.data?.items || [];
       if (dataToExport.length === 0) {
-        alert('Tidak ada data untuk diekspor');
+        alert('Tidak ada data riwayat untuk diekspor.');
         return;
       }
 
-      const headers = ['ID Peminjaman,Nomor Loker,Lokasi,ID Anggota,Nama Anggota,No HP,Tgl Pinjam,Batas Kembali,Tgl Kembali,Status,Denda,Petugas Pinjam,Petugas Kembali,Catatan'];
-      const rows = dataToExport.map((row) => [
-        row.id,
-        `"${row.nomor_loker}"`,
-        `"${row.lokasi_loker || ''}"`,
-        `"${row.member_id}"`,
-        `"${row.member_name || ''}"`,
-        `"${row.member_phone || ''}"`,
-        `"${row.tanggal_pinjam}"`,
-        `"${row.batas_kembali || ''}"`,
-        `"${row.tanggal_kembali || ''}"`,
-        `"${row.status}"`,
-        row.denda || 0,
-        `"${row.petugas_pinjam || ''}"`,
-        `"${row.petugas_kembali || ''}"`,
-        `"${(row.catatan || '').replace(/"/g, '""')}"`
-      ].join(','));
+      // Format data untuk spreadsheet Excel
+      const excelRows = dataToExport.map((row, index) => ({
+        'No': index + 1,
+        'Nama Mahasiswa': row.member_name || row.member_id,
+        'NIM': row.member_id,
+        'Fakultas': row.fakultas || '-',
+        'Program Studi': row.prodi || '-',
+        'Nomor Loker': row.nomor_loker,
+        'Lokasi Penempatan': row.lokasi_loker || '-',
+        'Waktu Pinjam': row.tanggal_pinjam ? formatDate(row.tanggal_pinjam) : '-',
+        'Waktu Kembali': row.tanggal_kembali ? formatDate(row.tanggal_kembali) : 'Sedang Dipinjam',
+        'Status': row.status === 'selesai' ? 'Selesai' : row.status === 'kunci_hilang' ? 'Kunci Hilang' : 'Aktif',
+        'Denda Kunci Hilang (Rp)': parseFloat(row.denda) || 0,
+        'Petugas Pinjam': row.petugas_pinjam || '-',
+        'Petugas Kembali': row.petugas_kembali || '-',
+        'Catatan': row.catatan || '-'
+      }));
 
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers, ...rows].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `Laporan_Loker_UNRI_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Buat Worksheet & Workbook
+      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+
+      // Atur lebar kolom (character width) agar dokumen rapi saat dibuka di Microsoft Excel
+      worksheet['!cols'] = [
+        { wch: 6 },  // No
+        { wch: 26 }, // Nama Mahasiswa
+        { wch: 15 }, // NIM
+        { wch: 18 }, // Fakultas
+        { wch: 25 }, // Program Studi
+        { wch: 14 }, // Nomor Loker
+        { wch: 25 }, // Lokasi Penempatan
+        { wch: 20 }, // Waktu Pinjam
+        { wch: 20 }, // Waktu Kembali
+        { wch: 15 }, // Status
+        { wch: 22 }, // Denda Kunci Hilang
+        { wch: 20 }, // Petugas Pinjam
+        { wch: 20 }, // Petugas Kembali
+        { wch: 25 }  // Catatan
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Peminjaman Loker');
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Laporan_Peminjaman_Loker_UNRI_${dateStr}.xlsx`);
     } catch (err) {
-      alert('Gagal mengekspor data: ' + err.message);
+      alert('Gagal mengekspor data ke Excel: ' + err.message);
     }
   };
 
@@ -153,15 +173,15 @@ export default function HistoryPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 bg-white hover:bg-[#faf9f6] text-[#1a1c1a] border border-[#c5c6ce] text-xs font-semibold py-2 px-3.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-colors shadow-2xs cursor-pointer"
           >
-            <Download className="w-4 h-4 text-[#75777e]" />
-            <span>Ekspor CSV</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+            <span>Ekspor Excel (.xlsx)</span>
           </button>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2 px-3.5 rounded-xl transition-all shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-2xs cursor-pointer"
           >
             <Printer className="w-4 h-4 text-[#ffdcc0]" />
             <span>Cetak Laporan</span>
@@ -239,24 +259,25 @@ export default function HistoryPage() {
             <thead>
               <tr className="bg-[#f4f3f0] text-[#031633] border-b border-[#e3e2e0] uppercase font-bold text-[10px] tracking-wider print:bg-slate-100 print:border-black">
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Loker</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Peminjam</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-2">Nama & NIM</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-2">Fakultas / Prodi</th>
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Waktu Pinjam</th>
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Waktu Kembali</th>
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Status</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Denda</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-2">Denda (Kunci Hilang)</th>
                 <th className="py-3 px-3 print:py-1.5 print:px-2">Petugas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 print:divide-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-10 text-center text-slate-400">
+                  <td colSpan="8" className="py-10 text-center text-slate-400">
                     Memuat data riwayat...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-10 text-center text-slate-400">
+                  <td colSpan="8" className="py-10 text-center text-slate-400">
                     Tidak ada riwayat peminjaman yang cocok dengan kriteria.
                   </td>
                 </tr>
@@ -277,20 +298,30 @@ export default function HistoryPage() {
                         {row.member_id}
                       </p>
                     </td>
+                    <td className="py-2.5 px-3 print:py-1.5 print:px-2">
+                      <p className="font-semibold text-slate-800">{row.fakultas || '-'}</p>
+                      <p className="text-slate-500 text-[11px]">{row.prodi || '-'}</p>
+                    </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-700">
                       {formatDate(row.tanggal_pinjam)}
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-700">
-                      {formatDate(row.tanggal_kembali)}
+                      {row.tanggal_kembali ? (
+                        formatDate(row.tanggal_kembali)
+                      ) : (
+                        <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                          Sedang Dipinjam
+                        </span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2">
                       <Badge status={row.status} size="sm" />
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2 font-medium">
-                      {row.denda > 0 ? (
+                      {parseFloat(row.denda) > 0 ? (
                         <span className="text-rose-600 print:text-black font-bold">{formatRupiah(row.denda)}</span>
                       ) : (
-                        <span className="text-slate-400 print:text-slate-600">-</span>
+                        <span className="text-slate-400 print:text-slate-600">Rp 0</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-500 text-[11px] print:text-slate-700">

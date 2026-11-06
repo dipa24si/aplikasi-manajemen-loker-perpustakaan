@@ -4,49 +4,20 @@ const { successResponse, errorResponse } = require('../utils/response');
 const TARIF_DENDA_PER_HARI = parseInt(process.env.DENDA_PER_HARI || '5000', 10);
 
 /**
- * Batas Pengembalian Otomatis:
- * Perpustakaan tutup pukul 16:00 (Jam 4 Sore).
- * Setiap peminjaman hari ini otomatis wajib kembali maksimal pukul 16:00:00 WIB.
+ * Kebijakan Baru:
+ * - Tidak ada batas waktu pinjam (bebas waktu).
+ * - Denda keterlambatan ditiadakan (0).
+ * - Denda HANYA dikenakan apabila kunci loker hilang (lapor ke petugas).
  */
 function getBatasKembaliOtomatis() {
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  const year = now.getFullYear();
-  const month = pad(now.getMonth() + 1);
-  const day = pad(now.getDate());
-  return `${year}-${month}-${day} 16:00:00`;
+  return null;
 }
 
-/**
- * Perhitungan Denda Keterlambatan:
- * Batas: Pukul 16:00 pada hari peminjaman.
- * - Jika dikembalikan sebelum atau pas pukul 16:00: Bebas denda (Rp 0).
- * - Jika lewat pukul 16:00 hari tersebut: Terhitung telat 1 hari (Rp 5.000).
- * - Jika tidak dikembalikan berhari-hari: Denda bertambah setiap hari (Rp 5.000 x jumlah hari).
- */
-function hitungDendaOtomatis(batasKembaliStr, tanggalKembali = new Date(), tarifPerHari = TARIF_DENDA_PER_HARI) {
-  if (!batasKembaliStr) return { hariTerlambat: 0, denda: 0 };
-
-  const batas = new Date(batasKembaliStr);
-  const now = new Date(tanggalKembali);
-
-  // Jika belum lewat jam 16:00 hari H
-  if (now <= batas) {
-    return { hariTerlambat: 0, denda: 0 };
-  }
-
-  // Hitung selisih milidetik dari batas jam 16:00
-  const selisihMs = now.getTime() - batas.getTime();
-  const satuHariMs = 24 * 60 * 60 * 1000;
-
-  // Lewat batas jam 16:00 langsung terhitung hari ke-1, selanjutnya bertambah per 24 jam
-  const hariTerlambat = Math.max(1, Math.ceil(selisihMs / satuHariMs));
-  const denda = hariTerlambat * tarifPerHari;
-
+function hitungDendaOtomatis(batasKembaliStr, tanggalKembali = new Date(), tarifPerHari = 0) {
   return {
-    hariTerlambat,
-    denda,
-    tarifPerHari
+    hariTerlambat: 0,
+    denda: 0,
+    tarifPerHari: 0
   };
 }
 
@@ -116,8 +87,9 @@ async function mandiriPinjam(req, res, next) {
       const findParams = [];
 
       if (lokasi && lokasi !== 'semua') {
-        findLokerQuery += ' AND lokasi = ?';
-        findParams.push(lokasi);
+        const cleaned = lokasi.trim().replace(/-/g, ' ');
+        findLokerQuery += ' AND (lokasi = ? OR lokasi LIKE ? OR lokasi LIKE ?)';
+        findParams.push(lokasi.trim(), `%${cleaned}%`, `%${lokasi.trim()}%`);
       }
 
       findLokerQuery += ' ORDER BY nomor ASC LIMIT 1 FOR UPDATE';
@@ -139,8 +111,8 @@ async function mandiriPinjam(req, res, next) {
       );
     }
 
-    // 4. Batas Pengembalian Otomatis: Pukul 16:00 WIB hari ini (Jam tutup perpustakaan)
-    const finalBatasKembali = getBatasKembaliOtomatis();
+    // 4. Tidak ada batas waktu pinjam (bebas waktu)
+    const finalBatasKembali = null;
 
     // 5. Simpan peminjaman
     const [insertResult] = await connection.query(
@@ -163,7 +135,7 @@ async function mandiriPinjam(req, res, next) {
       member_name: member.member_name,
       member_type: member.member_type_id,
       tanggal_pinjam: new Date().toISOString(),
-      batas_kembali: finalBatasKembali,
+      batas_kembali: null,
       qr_kunci: `LOKER:${targetLoker.nomor}`
     }, `Loker ${targetLoker.nomor} berhasil dialokasikan untuk ${member.member_name}. Silakan ambil struk dan tunjukkan ke petugas.`, 201);
   } catch (err) {
@@ -228,8 +200,8 @@ async function pinjam(req, res, next) {
       return errorResponse(res, `Loker ${loker.nomor} saat ini Not Available.`, 400);
     }
 
-    // Batas waktu otomatis jam 16:00
-    const finalBatasKembali = getBatasKembaliOtomatis();
+    // Tidak ada batas waktu pinjam (bebas waktu)
+    const finalBatasKembali = null;
 
     await connection.beginTransaction();
 
@@ -247,7 +219,7 @@ async function pinjam(req, res, next) {
       peminjaman_id: insertResult.insertId,
       nomor_loker: loker.nomor,
       member_name: member.member_name,
-      batas_kembali: finalBatasKembali
+      batas_kembali: null
     }, `Loker ${loker.nomor} berhasil dipinjamkan kepada ${member.member_name}.`, 201);
   } catch (err) {
     await connection.rollback();
@@ -326,19 +298,16 @@ async function kembali(req, res, next) {
     const finalStatus = status === 'kunci_hilang' ? 'kunci_hilang' : 'selesai';
     const newLokerStatus = finalStatus === 'kunci_hilang' ? 'rusak' : 'kosong';
 
-    // Hitung denda keterlambatan otomatis (jika lewat jam 16:00)
-    const infoDenda = hitungDendaOtomatis(loan.batas_kembali, new Date(), TARIF_DENDA_PER_HARI);
+    // Denda HANYA berlaku jika kunci hilang (tidak ada denda keterlambatan)
     let totalDendaFinal = 0;
-
-    if (denda !== undefined && denda !== null && denda !== '') {
-      totalDendaFinal = parseFloat(denda) || 0;
+    if (finalStatus === 'kunci_hilang') {
+      if (denda !== undefined && denda !== null && denda !== '') {
+        totalDendaFinal = parseFloat(denda) || 0;
+      } else {
+        totalDendaFinal = 25000; // Biaya standar penggantian anak kunci hilang
+      }
     } else {
-      totalDendaFinal = infoDenda.denda;
-    }
-
-    // Jika kunci hilang, tambahkan biaya ganti kunci Rp 25.000 jika belum dimasukkan
-    if (finalStatus === 'kunci_hilang' && totalDendaFinal < 25000) {
-      totalDendaFinal += 25000;
+      totalDendaFinal = 0; // Pengembalian normal selalu bebas denda
     }
 
     await connection.beginTransaction();
@@ -361,15 +330,19 @@ async function kembali(req, res, next) {
 
     await connection.commit();
 
+    const returnMsg = finalStatus === 'kunci_hilang'
+      ? `Laporan kunci hilang untuk Loker ${loan.nomor_loker} (${loan.member_name}) berhasil dicatat. Denda penggantian kunci: Rp ${totalDendaFinal.toLocaleString('id-ID')}.`
+      : `Kunci loker ${loan.nomor_loker} (${loan.member_name}) berhasil diterima. Loker sekarang AVAILABLE kembali (Bebas Denda).`;
+
     return successResponse(res, {
       peminjaman_id: loan.id,
       nomor_loker: loan.nomor_loker,
       member_name: loan.member_name,
       status: finalStatus,
       status_loker: newLokerStatus === 'kosong' ? 'available' : 'not_available',
-      hari_terlambat: infoDenda.hariTerlambat,
+      hari_terlambat: 0,
       denda: totalDendaFinal
-    }, `Kunci loker ${loan.nomor_loker} (${loan.member_name}) berhasil diterima. Loker sekarang AVAILABLE kembali.`);
+    }, returnMsg);
   } catch (err) {
     await connection.rollback();
     next(err);
@@ -400,11 +373,13 @@ async function getActiveLoan(req, res, next) {
         l.lokasi,
         l.ukuran,
         a.member_name,
+        COALESCE(a.fakultas, '-') AS fakultas,
+        COALESCE(a.prodi, '-') AS prodi,
         a.member_type_id,
         a.member_phone,
         a.member_email,
         pt.nama AS nama_petugas_pinjam,
-        CASE WHEN p.batas_kembali IS NOT NULL AND p.batas_kembali < NOW() THEN 1 ELSE 0 END AS is_overdue
+        0 AS is_overdue
       FROM peminjaman p
       JOIN lokers l ON l.id = p.loker_id
       LEFT JOIN v_anggota a ON a.member_id = p.member_id

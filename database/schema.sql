@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS lokers (
 CREATE TABLE IF NOT EXISTS anggota (
   member_id      VARCHAR(20)  NOT NULL,
   member_name    VARCHAR(100) NOT NULL,
+  fakultas       VARCHAR(100) NULL,
+  prodi          VARCHAR(100) NULL,
   member_type_id VARCHAR(50)  NOT NULL DEFAULT 'Reguler',
   member_email   VARCHAR(100) NULL,
   member_phone   VARCHAR(50)  NULL,
@@ -70,6 +72,8 @@ CREATE OR REPLACE VIEW v_anggota AS
 SELECT
   member_id,
   member_name,
+  fakultas,
+  prodi,
   member_type_id,
   member_email,
   member_phone,
@@ -346,4 +350,26 @@ FROM lokers WHERE nomor = 'A-02'
 LIMIT 1;
 
 UPDATE lokers SET status = 'terpakai' WHERE nomor = 'A-02';
+
+-- ---------------------------------------------------------------------
+-- 6. TABEL KIOSKS (ANJUNGAN MANDIRI)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS kiosks (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  nama VARCHAR(100) NOT NULL,
+  slug VARCHAR(50) NOT NULL,
+  lokasi VARCHAR(100) NOT NULL,
+  keterangan VARCHAR(255) NULL,
+  aktif TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_kiosk_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO kiosks (nama, slug, lokasi, keterangan) VALUES
+  ('Anjungan Sayap Kiri', 'sayap-kiri', 'Lantai 1 - Sayap Kiri', 'Monitor kiosk touchscreen Sayap Kiri'),
+  ('Anjungan Sayap Kanan', 'sayap-kanan', 'Lantai 1 - Sayap Kanan', 'Monitor kiosk touchscreen Sayap Kanan')
+ON DUPLICATE KEY UPDATE nama = VALUES(nama), lokasi = VALUES(lokasi);
+
 

@@ -96,6 +96,18 @@ export default function LockerDetailModal({
                 <span className="text-[#75777e]">ID / NIM</span>
                 <span className="font-mono font-bold text-[#031633]">{loker.member_id}</span>
               </div>
+              {loker.fakultas && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[#75777e]">Fakultas</span>
+                  <span className="font-semibold text-[#031633]">{loker.fakultas}</span>
+                </div>
+              )}
+              {loker.prodi && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[#75777e]">Program Studi</span>
+                  <span className="font-semibold text-[#031633]">{loker.prodi}</span>
+                </div>
+              )}
               {loker.member_type_id && (
                 <div className="flex items-center justify-between">
                   <span className="text-[#75777e]">Jenis Anggota</span>
