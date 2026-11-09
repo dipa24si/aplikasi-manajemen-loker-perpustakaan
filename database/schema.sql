@@ -50,11 +50,10 @@ CREATE TABLE IF NOT EXISTS lokers (
 CREATE TABLE IF NOT EXISTS anggota (
   member_id      VARCHAR(20)  NOT NULL,
   member_name    VARCHAR(100) NOT NULL,
-  fakultas       VARCHAR(100) NULL,
-  prodi          VARCHAR(100) NULL,
+  member_instansi       VARCHAR(100) NULL,
+  inst_name          VARCHAR(100) NULL,
   member_type_id VARCHAR(50)  NOT NULL DEFAULT 'Reguler',
   member_email   VARCHAR(100) NULL,
-  member_phone   VARCHAR(50)  NULL,
   expire_date    DATE         NOT NULL,
   is_pending     TINYINT(1)   NOT NULL DEFAULT 0,
   aktif          TINYINT(1)   NOT NULL DEFAULT 1,
@@ -72,11 +71,10 @@ CREATE OR REPLACE VIEW v_anggota AS
 SELECT
   member_id,
   member_name,
-  fakultas,
-  prodi,
+  member_instansi,
+  inst_name,
   member_type_id,
   member_email,
-  member_phone,
   expire_date,
   is_pending,
   aktif
@@ -334,7 +332,7 @@ INSERT INTO lokers (nomor, lokasi, ukuran, status, catatan) VALUES
 ON DUPLICATE KEY UPDATE lokasi = VALUES(lokasi), ukuran = VALUES(ukuran);
 
 -- Data Anggota Demo (Struktur SLiMS)
-INSERT INTO anggota (member_id, member_name, member_type_id, member_email, member_phone, expire_date, is_pending, aktif) VALUES
+INSERT INTO anggota (member_id, member_name, member_type_id, member_email, expire_date, is_pending, aktif) VALUES
   ('M001', 'Ahmad Fauzi', 'Mahasiswa', 'ahmad.fauzi@kampus.ac.id', '081234567801', '2028-12-31', 0, 1),
   ('M002', 'Siti Nurhaliza', 'Mahasiswa', 'siti.nur@kampus.ac.id', '081234567802', '2028-12-31', 0, 1),
   ('M003', 'Budi Santoso', 'Dosen', 'budi.santoso@kampus.ac.id', '081234567803', '2030-12-31', 0, 1),

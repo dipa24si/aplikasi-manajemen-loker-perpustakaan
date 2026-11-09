@@ -15,7 +15,7 @@ export default function Badge({ status, text, size = 'md' }) {
       if (!text) label = 'Available';
       break;
 
-    // 2. Status Loker Utama: Not Available (Terpakai / Rusak)
+    // 2. Status Loker: Not Available (Terpakai / Dipinjam)
     case 'not_available':
     case 'terpakai':
     case 'aktif':
@@ -23,9 +23,12 @@ export default function Badge({ status, text, size = 'md' }) {
       if (!text) label = 'Not Available';
       break;
 
+    // 3. Status Loker: Maintenance (Rusak / Perbaikan)
     case 'rusak':
-      colorClasses = 'bg-amber-50 text-amber-700 border-amber-200';
-      if (!text) label = 'Not Available';
+    case 'maintenance':
+    case 'perbaikan':
+      colorClasses = 'bg-amber-50 text-amber-800 border-amber-300 font-semibold';
+      if (!text) label = 'Maintenance';
       break;
 
     case 'kunci_hilang':

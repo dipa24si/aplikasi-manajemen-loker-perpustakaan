@@ -30,7 +30,14 @@ export default function LoginPage() {
     try {
       await login(username.trim(), password);
     } catch (err) {
-      setError(err.message || 'Gagal masuk. Periksa kembali akun Anda.');
+      let msg = err.message || 'Gagal masuk. Periksa kembali akun Anda.';
+      if (
+        /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(msg) ||
+        /ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|ENOTFOUND|terputus|database/i.test(msg)
+      ) {
+        msg = 'Database tidak terhubung. Silakan hubungi administrator sistem atau periksa jaringan kampus.';
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -161,7 +168,7 @@ export default function LoginPage() {
 
       {/* Bottom Footer Note */}
       <div className="absolute bottom-3 text-center text-xs text-[#75777e] pointer-events-none">
-        <p>© 2026 UPT Perpustakaan Universitas Riau • Kampus Bina Widya Km. 12,5</p>
+        <p>© 2026 UPA Perpustakaan Universitas Riau • Kampus Bina Widya Km. 12,5</p>
       </div>
     </div>
   );

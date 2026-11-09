@@ -16,6 +16,24 @@ function AppContent() {
   const { isAuthenticated, loading, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  // State sidebar sembunyi (collapsed: hanya tampil icon/logo saja)
+  // Otomatis sembunyi di layar ponsel (< 768px) agar halaman lega
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return true;
+    }
+    const saved = localStorage.getItem('sidebar_collapsed');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Deteksi apakah rute adalah halaman Kiosk Mandiri (misal: /sirkulasi, /sayap-kiri, /sayap-kanan, /kiosk)
   const path = window.location.pathname.toLowerCase().replace(/^\/+|\/+$/g, '');
   const segments = path.split('/');
@@ -50,18 +68,26 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#faf9f6] text-[#1a1c1a] font-hanken">
-      <Navbar />
+    <div className="h-screen flex flex-col bg-[#faf9f6] text-[#1a1c1a] font-hanken overflow-hidden">
+      <Navbar
+        sidebarCollapsed={sidebarCollapsed}
+        toggleSidebar={toggleSidebar}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          collapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-8 min-w-0 h-full">
           {activeTab === 'dashboard' && <DashboardPage />}
           {activeTab === 'transaksi' && <TransaksiPage />}
           {activeTab === 'history' && <HistoryPage />}
           {activeTab === 'lokers' && <LokerManagePage />}
-          {activeTab === 'kiosks' && isAdmin && <KioskManagePage />}
+          {activeTab === 'kiosks' && isAdmin && <KioskManagePage setActiveTab={setActiveTab} />}
           {activeTab === 'petugas' && isAdmin && <PetugasPage />}
         </main>
       </div>

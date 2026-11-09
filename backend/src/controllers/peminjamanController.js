@@ -196,8 +196,11 @@ async function pinjam(req, res, next) {
     }
 
     const loker = lokers[0];
+    if (loker.status === 'rusak') {
+      return errorResponse(res, `Loker ${loker.nomor} saat ini sedang dalam perbaikan (Maintenance).`, 400);
+    }
     if (loker.status !== 'kosong') {
-      return errorResponse(res, `Loker ${loker.nomor} saat ini Not Available.`, 400);
+      return errorResponse(res, `Loker ${loker.nomor} saat ini sedang dipinjam (Terpakai).`, 400);
     }
 
     // Tidak ada batas waktu pinjam (bebas waktu)
@@ -275,6 +278,21 @@ async function kembali(req, res, next) {
       const [foundLoans] = await connection.query(findQuery, findParams);
 
       if (foundLoans.length === 0) {
+        // Cek apakah loker ini berstatus 'terpakai' namun peminjamannya tidak aktif (data tidak sinkron)
+        if (loker_id || nomor_loker) {
+          const [orphanLoker] = await connection.query(
+            'SELECT id, nomor, status FROM lokers WHERE id = ? OR nomor = ?',
+            [loker_id || null, nomor_loker ? nomor_loker.trim() : null]
+          );
+          if (orphanLoker.length > 0 && orphanLoker[0].status === 'terpakai') {
+            await connection.query('UPDATE lokers SET status = "kosong" WHERE id = ?', [orphanLoker[0].id]);
+            return successResponse(
+              res,
+              { loker_nomor: orphanLoker[0].nomor, status: 'kosong' },
+              `Loker ${orphanLoker[0].nomor} tidak memiliki peminjam aktif dan telah otomatis di-reset menjadi Available.`
+            );
+          }
+        }
         return errorResponse(res, `Tidak ditemukan peminjaman aktif untuk kunci loker "${nomor_loker || loker_id || member_id}".`, 404);
       }
       targetLoanId = foundLoans[0].id;
@@ -373,10 +391,9 @@ async function getActiveLoan(req, res, next) {
         l.lokasi,
         l.ukuran,
         a.member_name,
-        COALESCE(a.fakultas, '-') AS fakultas,
-        COALESCE(a.prodi, '-') AS prodi,
+        COALESCE(a.member_instansi, '-') AS member_instansi,
+        COALESCE(a.inst_name, '-') AS inst_name,
         a.member_type_id,
-        a.member_phone,
         a.member_email,
         pt.nama AS nama_petugas_pinjam,
         0 AS is_overdue

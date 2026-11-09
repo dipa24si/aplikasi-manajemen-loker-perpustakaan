@@ -1,19 +1,23 @@
 import React from 'react';
 import { formatTime, isOverdue } from '../../utils/formatters';
-import { User, Clock, MapPin, KeyRound, Lock } from 'lucide-react';
+import { User, Clock, MapPin, KeyRound, Lock, Wrench } from 'lucide-react';
 
 export default function LockerCard({ loker, onSelect }) {
   const isAvailable = loker.status === 'kosong';
+  const isMaintenance = loker.status === 'rusak';
   const isLockerOverdue = isOverdue(loker.batas_kembali, loker.status);
+
+  let cardStyle = 'bg-rose-50/50 border-rose-300/80 hover:border-rose-500 hover:shadow-rose-600/10';
+  if (isAvailable) {
+    cardStyle = 'bg-emerald-50/50 border-emerald-300/80 hover:border-emerald-500 hover:shadow-emerald-600/10';
+  } else if (isMaintenance) {
+    cardStyle = 'bg-amber-50/60 border-amber-300/80 hover:border-amber-500 hover:shadow-amber-600/10';
+  }
 
   return (
     <div
       onClick={() => onSelect(loker)}
-      className={`group relative flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 transition-all cursor-pointer shadow-2xs hover:shadow-md hover:-translate-y-0.5 font-hanken ${
-        isAvailable
-          ? 'bg-emerald-50/50 border-emerald-300/80 hover:border-emerald-500 hover:shadow-emerald-600/10'
-          : 'bg-rose-50/50 border-rose-300/80 hover:border-rose-500 hover:shadow-rose-600/10'
-      }`}
+      className={`group relative flex flex-col justify-between rounded-xl border p-3 sm:p-3.5 transition-all cursor-pointer shadow-2xs hover:shadow-md hover:-translate-y-0.5 font-hanken ${cardStyle}`}
     >
       {/* Top Header: Locker Number */}
       <div className="flex items-center justify-between">
@@ -28,9 +32,14 @@ export default function LockerCard({ loker, onSelect }) {
         <span className="truncate">{loker.lokasi || 'Area Umum'}</span>
       </div>
 
-      {/* Middle Body: Peminjam Info atau Siap Dipinjam */}
+      {/* Middle Body: Peminjam Info / Siap Dipinjam / Maintenance */}
       <div className="my-2 min-h-[36px] flex flex-col justify-center">
-        {!isAvailable ? (
+        {isMaintenance ? (
+          <div className="flex items-center gap-1.5 text-xs text-amber-800 font-bold">
+            <Wrench className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <span className="truncate">Maintenance (Perbaikan)</span>
+          </div>
+        ) : !isAvailable ? (
           <div className="space-y-0.5">
             <div className="flex items-center gap-1 text-xs font-bold text-[#031633] truncate" title={loker.member_name || loker.member_id}>
               <User className="w-3 h-3 text-rose-600 shrink-0" />
@@ -54,18 +63,24 @@ export default function LockerCard({ loker, onSelect }) {
       {/* Bottom Footer: Badge Status */}
       <div className="pt-2 border-t border-[#e3e2e0]/80 flex items-center justify-between gap-1">
         <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+          className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold border whitespace-nowrap ${
             isAvailable
               ? 'bg-emerald-100/90 text-emerald-900 border-emerald-300'
+              : isMaintenance
+              ? 'bg-amber-100/90 text-amber-900 border-amber-300'
               : 'bg-rose-100/90 text-rose-900 border-rose-300'
           }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
-          <span>{isAvailable ? 'Available' : 'Not Available'}</span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              isAvailable ? 'bg-emerald-600' : isMaintenance ? 'bg-amber-600' : 'bg-rose-600'
+            }`}
+          ></span>
+          <span className="truncate">{isAvailable ? 'Available' : isMaintenance ? 'Maintenance' : 'Not Available'}</span>
         </span>
 
         {isLockerOverdue && (
-          <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1 py-0.5 rounded-sm animate-pulse border border-red-300">
+          <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1 py-0.5 rounded-sm animate-pulse border border-red-300 shrink-0">
             Telat
           </span>
         )}

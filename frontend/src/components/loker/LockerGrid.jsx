@@ -27,9 +27,10 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
 
       if (!matchSearch) return false;
 
-      // 2. Status: Available (kosong) vs Not Available (terpakai / rusak)
+      // 2. Status: Available (kosong), Terpakai, Maintenance (rusak)
       if (statusFilter === 'available' && loker.status !== 'kosong') return false;
-      if (statusFilter === 'not_available' && loker.status === 'kosong') return false;
+      if (statusFilter === 'not_available' && loker.status !== 'terpakai') return false;
+      if (statusFilter === 'maintenance' && loker.status !== 'rusak') return false;
 
       // 3. Lokasi
       if (locationFilter !== 'semua' && loker.lokasi !== locationFilter) return false;
@@ -38,12 +39,13 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
     });
   }, [lokers, searchTerm, statusFilter, locationFilter]);
 
-  // Hitung jumlah Available vs Not Available
+  // Hitung jumlah Available, Terpakai, dan Maintenance
   const counts = useMemo(() => {
     return {
       total: lokers.length,
       available: lokers.filter((l) => l.status === 'kosong').length,
-      not_available: lokers.filter((l) => l.status !== 'kosong').length
+      not_available: lokers.filter((l) => l.status === 'terpakai').length,
+      maintenance: lokers.filter((l) => l.status === 'rusak').length
     };
   }, [lokers]);
 
@@ -64,24 +66,24 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
   return (
     <div className="space-y-4 font-hanken">
       {/* Control Bar: Search & Filter Lokasi & Status */}
-      <div className="bg-white p-4 rounded-2xl border border-[#e3e2e0] shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#e3e2e0] shadow-2xs flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative w-full sm:w-auto flex-1 min-w-[160px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#75777e]" />
           <input
             type="text"
             placeholder="Cari nomor loker, lokasi, peminjam..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-[#faf9f6] border border-[#c5c6ce] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] transition-all"
+            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-[#faf9f6] border border-[#c5c6ce] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] transition-all"
           />
         </div>
 
-        {/* Status Filter: HANYA Available & Not Available */}
-        <div className="flex items-center gap-1 bg-[#efeeeb] p-1 rounded-xl text-xs font-semibold">
+        {/* Status Filter */}
+        <div className="flex items-center gap-1 bg-[#efeeeb] p-1 rounded-xl text-xs font-semibold overflow-x-auto max-w-full no-scrollbar shrink-0">
           <button
             onClick={() => setStatusFilter('semua')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               statusFilter === 'semua' ? 'bg-[#031633] text-white shadow-xs' : 'text-[#44474e] hover:text-[#031633]'
             }`}
           >
@@ -89,33 +91,44 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
           </button>
           <button
             onClick={() => setStatusFilter('available')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               statusFilter === 'available' ? 'bg-emerald-700 text-white shadow-xs' : 'text-[#44474e] hover:text-emerald-700'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400"></span>
             Available ({counts.available})
           </button>
           <button
             onClick={() => setStatusFilter('not_available')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
               statusFilter === 'not_available' ? 'bg-rose-700 text-white shadow-xs' : 'text-[#44474e] hover:text-rose-700'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-rose-400"></span>
-            Not Available ({counts.not_available})
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-rose-400"></span>
+            Terpakai ({counts.not_available})
           </button>
+          {counts.maintenance > 0 && (
+            <button
+              onClick={() => setStatusFilter('maintenance')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-[11px] sm:text-xs ${
+                statusFilter === 'maintenance' ? 'bg-amber-600 text-white shadow-xs' : 'text-[#44474e] hover:text-amber-700'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400"></span>
+              Maintenance ({counts.maintenance})
+            </button>
+          )}
         </div>
 
-        {/* Dropdown Filter Lokasi */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        {/* Dropdown Filter Lokasi & Aksi */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
+          <div className="relative flex-1 sm:flex-none">
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+              className="w-full sm:w-auto text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-2.5 sm:px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
             >
-              <option value="semua">📍 Semua Lokasi Lantai</option>
+              <option value="semua">📍 Semua Zona Lantai</option>
               {uniqueLocations.map((loc) => (
                 <option key={loc} value={loc}>
                   📍 {loc}
@@ -124,28 +137,30 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
             </select>
           </div>
 
-          {/* Toggle Grouping per Lokasi */}
-          <button
-            onClick={() => setGroupByLocation(!groupByLocation)}
-            title={groupByLocation ? 'Beralih ke tampilan grid biasa' : 'Kelompokkan berdasarkan lokasi'}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
-              groupByLocation
-                ? 'bg-[#031633] text-white border-[#031633]'
-                : 'bg-white text-[#44474e] border-[#c5c6ce] hover:bg-[#faf9f6]'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Per Lokasi</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* Toggle Grouping per Lokasi */}
+            <button
+              onClick={() => setGroupByLocation(!groupByLocation)}
+              title={groupByLocation ? 'Beralih ke tampilan grid biasa' : 'Kelompokkan berdasarkan lokasi'}
+              className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                groupByLocation
+                  ? 'bg-[#031633] text-white border-[#031633]'
+                  : 'bg-white text-[#44474e] border-[#c5c6ce] hover:bg-[#faf9f6]'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Per Lokasi</span>
+            </button>
 
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            title="Refresh Status Loker"
-            className="p-2 text-[#75777e] hover:text-[#031633] hover:bg-[#faf9f6] rounded-xl border border-[#c5c6ce] transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              title="Refresh Status Loker"
+              className="p-2 text-[#75777e] hover:text-[#031633] hover:bg-[#faf9f6] rounded-xl border border-[#c5c6ce] transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -161,24 +176,29 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
         <div className="space-y-6">
           {Object.entries(groupedLokers).map(([locName, lokersInLoc]) => (
             <div key={locName} className="bg-white rounded-2xl border border-[#e3e2e0] p-5 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-[#efeeeb] pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-[#ffdcc0] text-[#6b3b00]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#efeeeb] pb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-[#ffdcc0] text-[#6b3b00] shrink-0">
                     <MapPin className="w-4 h-4" />
                   </div>
-                  <h4 className="font-editorial text-base font-bold text-[#031633]">{locName}</h4>
+                  <h4 className="font-editorial text-sm sm:text-base font-bold text-[#031633] truncate">{locName}</h4>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px] whitespace-nowrap">
                     {lokersInLoc.filter((l) => l.status === 'kosong').length} Available
                   </span>
-                  <span className="text-rose-800 font-bold bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                    {lokersInLoc.filter((l) => l.status !== 'kosong').length} Not Available
+                  <span className="text-rose-800 font-bold bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 text-[11px] whitespace-nowrap">
+                    {lokersInLoc.filter((l) => l.status === 'terpakai').length} Terpakai
                   </span>
+                  {lokersInLoc.some((l) => l.status === 'rusak') && (
+                    <span className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 text-[11px] whitespace-nowrap">
+                      {lokersInLoc.filter((l) => l.status === 'rusak').length} Maintenance
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10 gap-2 sm:gap-3">
                 {lokersInLoc.map((loker) => (
                   <LockerCard key={loker.id} loker={loker} onSelect={onSelectLoker} />
                 ))}
@@ -188,7 +208,7 @@ export default function LockerGrid({ lokers = [], onSelectLoker, onRefresh, load
         </div>
       ) : (
         /* TAMPILAN GRID BIASA */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 2xl:grid-cols-10 gap-2 sm:gap-3">
           {filteredLokers.map((loker) => (
             <LockerCard key={loker.id} loker={loker} onSelect={onSelectLoker} />
           ))}

@@ -168,20 +168,20 @@ export default function LockerDetailModal({
               className="w-full flex items-center justify-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all text-sm cursor-pointer"
             >
               <RotateCcw className="w-4 h-4 text-[#ffdcc0]" />
-              Proses Pengembalian Kunci
+              {(!loker.member_id && !loker.tanggal_pinjam) ? 'Reset Loker ke Available' : 'Proses Pengembalian Kunci'}
             </button>
           )}
 
-          {/* Status Switch (Kosong vs Rusak) */}
+          {/* Status Switch (Kosong vs Maintenance/Rusak) */}
           {loker.status !== 'terpakai' && (
             <div className="flex gap-2">
               {loker.status === 'kosong' ? (
                 <button
                   disabled={statusLoading}
                   onClick={() => handleToggleStatus('rusak')}
-                  className="w-full py-2.5 px-3 border border-rose-300 text-rose-800 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="w-full py-2.5 px-3 border border-amber-300 text-amber-800 hover:bg-amber-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Tandai Not Available (Perbaikan)
+                  Tandai Maintenance (Perbaikan)
                 </button>
               ) : (
                 <button
@@ -189,7 +189,7 @@ export default function LockerDetailModal({
                   onClick={() => handleToggleStatus('kosong')}
                   className="w-full py-2.5 px-3 border border-emerald-300 text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Tandai Available (Siap Digunakan)
+                  Tandai Available (Selesai Maintenance)
                 </button>
               )}
             </div>

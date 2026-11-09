@@ -3,6 +3,12 @@ const { successResponse, errorResponse } = require('../utils/response');
 
 async function getAllLokers(req, res, next) {
   try {
+    // Sinkronisasi otomatis: pulihkan loker yang 'terpakai' tapi tidak punya peminjaman aktif
+    await db.query(
+      'UPDATE lokers l SET l.status = ? WHERE l.status = ? AND NOT EXISTS (SELECT 1 FROM peminjaman p WHERE p.loker_id = l.id AND p.status = ?)',
+      ['kosong', 'terpakai', 'aktif']
+    );
+
     const { status, lokasi, ukuran, search } = req.query;
 
     let query = `
@@ -21,10 +27,9 @@ async function getAllLokers(req, res, next) {
         p.batas_kembali,
         p.catatan AS catatan_pinjam,
         COALESCE(a.member_name, p.member_id) AS member_name,
-        COALESCE(a.fakultas, '-') AS fakultas,
-        COALESCE(a.prodi, '-') AS prodi,
+        COALESCE(a.member_instansi, '-') AS member_instansi,
+        COALESCE(a.inst_name, '-') AS inst_name,
         a.member_type_id,
-        a.member_phone,
         pt.nama AS nama_petugas
       FROM lokers l
       LEFT JOIN peminjaman p ON p.loker_id = l.id AND p.status = 'aktif'
@@ -76,10 +81,9 @@ async function getLokerById(req, res, next) {
         p.tanggal_pinjam,
         p.batas_kembali,
         COALESCE(a.member_name, p.member_id) AS member_name,
-        COALESCE(a.fakultas, '-') AS fakultas,
-        COALESCE(a.prodi, '-') AS prodi,
+        COALESCE(a.member_instansi, '-') AS member_instansi,
+        COALESCE(a.inst_name, '-') AS inst_name,
         a.member_type_id,
-        a.member_phone
       FROM lokers l
       LEFT JOIN peminjaman p ON p.loker_id = l.id AND p.status = 'aktif'
       LEFT JOIN v_anggota a ON a.member_id = p.member_id

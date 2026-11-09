@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../common/Modal';
-import { peminjamanApi } from '../../api';
+import { peminjamanApi, lokerApi } from '../../api';
 import { formatDate, formatRupiah, isOverdue, hitungDenda } from '../../utils/formatters';
-import { RotateCcw, AlertTriangle, Key, AlertCircle } from 'lucide-react';
+import { RotateCcw, AlertTriangle, Key, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess }) {
   const [isKeyLost, setIsKeyLost] = useState(false);
@@ -10,6 +10,9 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
   const [catatan, setCatatan] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Periksa apakah loker memiliki catatan peminjaman aktif
+  const hasActiveLoan = Boolean(loker && (loker.member_id || loker.member_name || loker.tanggal_pinjam));
 
   // Hitung denda jika loker ada
   const overdue = loker ? isOverdue(loker.batas_kembali, loker.status) : false;
@@ -47,12 +50,17 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
     setError('');
 
     try {
-      await peminjamanApi.kembali({
-        loker_id: loker.id,
-        status: isKeyLost ? 'kunci_hilang' : 'selesai',
-        denda: parseFloat(denda) || 0,
-        catatan: catatan.trim() || null
-      });
+      if (!hasActiveLoan) {
+        // Loker tidak memiliki pinjaman aktif, reset status menjadi kosong
+        await lokerApi.updateStatus(loker.id, { status: 'kosong' });
+      } else {
+        await peminjamanApi.kembali({
+          loker_id: loker.id,
+          status: isKeyLost ? 'kunci_hilang' : 'selesai',
+          denda: parseFloat(denda) || 0,
+          catatan: catatan.trim() || null
+        });
+      }
 
       onSuccess();
       onClose();
@@ -86,76 +94,94 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[#75777e]">Peminjam</span>
-            <span className="font-bold text-[#031633]">{loker.member_name || loker.member_id}</span>
+            <span className="font-bold text-[#031633]">
+              {loker.member_name || loker.member_id || '(Tidak ada data aktif)'}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[#75777e]">Waktu Pinjam</span>
-            <span className="text-[#44474e] font-medium">{formatDate(loker.tanggal_pinjam)}</span>
+            <span className="text-[#44474e] font-medium">
+              {loker.tanggal_pinjam ? formatDate(loker.tanggal_pinjam) : '-'}
+            </span>
           </div>
         </div>
 
-        {/* Info Denda: Hanya Jika Kunci Hilang */}
-        {isKeyLost ? (
-          <div className="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-xl space-y-1">
+        {!hasActiveLoan ? (
+          <div className="bg-amber-50 border border-amber-300 text-amber-900 text-xs p-3.5 rounded-xl space-y-1.5">
             <div className="flex items-center gap-1.5 font-bold">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>Status: Kunci Hilang Dilaporkan</span>
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Status Loker Perlu Sinkronisasi</span>
             </div>
-            <p className="text-rose-700 text-[11px] leading-relaxed">
-              Mahasiswa melaporkan anak kunci loker hilang. Denda penggantian kunci dapat disesuaikan di bawah.
+            <p className="text-amber-800 text-[11px] leading-relaxed">
+              Loker ini ditandai terpakai tetapi tidak memiliki catatan peminjaman aktif. Klik tombol di bawah untuk langsung me-reset loker ke status <b>Available (Siap Dipinjam)</b>.
             </p>
           </div>
         ) : (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="font-medium">Kunci lengkap dikembalikan ke petugas (Bebas Denda).</span>
-          </div>
-        )}
+          <>
+            {/* Info Denda: Hanya Jika Kunci Hilang */}
+            {isKeyLost ? (
+              <div className="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-xl space-y-1">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Status: Kunci Hilang Dilaporkan</span>
+                </div>
+                <p className="text-rose-700 text-[11px] leading-relaxed">
+                  Mahasiswa melaporkan anak kunci loker hilang. Denda penggantian kunci dapat disesuaikan di bawah.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span className="font-medium">Kunci lengkap dikembalikan ke petugas (Bebas Denda).</span>
+              </div>
+            )}
 
-        {/* Checkbox Kunci Hilang */}
-        <div className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3">
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isKeyLost}
-              onChange={handleKeyLostToggle}
-              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-[#c5c6ce] cursor-pointer"
-            />
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-800">
-              <Key className="w-4 h-4 text-rose-500" />
-              <span>Mahasiswa Melaporkan Kunci Hilang (+ Rp 25.000)</span>
+            {/* Checkbox Kunci Hilang */}
+            <div className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isKeyLost}
+                  onChange={handleKeyLostToggle}
+                  className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-[#c5c6ce] cursor-pointer"
+                />
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-800">
+                  <Key className="w-4 h-4 text-rose-500" />
+                  <span>Mahasiswa Melaporkan Kunci Hilang (+ Rp 25.000)</span>
+                </div>
+              </label>
             </div>
-          </label>
-        </div>
 
-        {/* Input Denda */}
-        <div>
-          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
-            Total Denda yang Dikenakan (Rp)
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="1000"
-            value={denda}
-            onChange={(e) => setDenda(e.target.value)}
-            className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
-          />
-        </div>
+            {/* Input Denda */}
+            <div>
+              <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
+                Total Denda yang Dikenakan (Rp)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={denda}
+                onChange={(e) => setDenda(e.target.value)}
+                className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
+              />
+            </div>
 
-        {/* Catatan */}
-        <div>
-          <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
-            Catatan Tambahan
-          </label>
-          <input
-            type="text"
-            placeholder="Catatan..."
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
-          />
-        </div>
+            {/* Catatan */}
+            <div>
+              <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
+                Catatan Tambahan
+              </label>
+              <input
+                type="text"
+                placeholder="Catatan..."
+                value={catatan}
+                onChange={(e) => setCatatan(e.target.value)}
+                className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
+              />
+            </div>
+          </>
+        )}
 
         {/* Submit Button */}
         <div className="pt-2">
@@ -164,8 +190,16 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
             disabled={loading}
             className="w-full flex items-center justify-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold py-2.5 px-4 rounded-xl shadow-xs transition-all text-xs disabled:opacity-50 cursor-pointer"
           >
-            <RotateCcw className="w-4 h-4 text-[#ffdcc0]" />
-            {loading ? 'Menyimpan...' : 'Konfirmasi Pengembalian'}
+            {loading ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-[#ffdcc0]" />
+            ) : (
+              <RotateCcw className="w-4 h-4 text-[#ffdcc0]" />
+            )}
+            {loading
+              ? 'Memproses...'
+              : !hasActiveLoan
+              ? 'Reset Loker ke Available'
+              : 'Konfirmasi Pengembalian'}
           </button>
         </div>
       </form>

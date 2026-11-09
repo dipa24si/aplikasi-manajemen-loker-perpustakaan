@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import BarcodeScannerInput from '../components/transaksi/BarcodeScannerInput';
 import Modal from '../components/common/Modal';
-import { peminjamanApi, lokerApi } from '../api';
+import { peminjamanApi, lokerApi, kioskApi } from '../api';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatRupiah, isOverdue, hitungDenda } from '../utils/formatters';
-import { 
-  ScanLine, 
-  RotateCcw, 
-  CheckCircle, 
-  AlertCircle, 
-  Key, 
-  Printer, 
-  MapPin, 
-  Clock, 
+import {
+  ScanLine,
+  RotateCcw,
+  CheckCircle,
+  AlertCircle,
+  Key,
+  Printer,
+  MapPin,
+  Clock,
   AlertTriangle,
   Search
 } from 'lucide-react';
@@ -26,6 +26,8 @@ export default function TransaksiPage() {
   // Modal Cetak Label QR Kunci
   const [isPrintLabelsOpen, setIsPrintLabelsOpen] = useState(false);
   const [allLokers, setAllLokers] = useState([]);
+  const [kiosks, setKiosks] = useState([]);
+  const [isGeneratingForKiosk, setIsGeneratingForKiosk] = useState(false);
   const [printLocationFilter, setPrintLocationFilter] = useState('semua');
   const [labelSearchQuery, setLabelSearchQuery] = useState('');
   const [selectedLokerIds, setSelectedLokerIds] = useState(new Set());
@@ -41,14 +43,37 @@ export default function TransaksiPage() {
     }
   };
 
+  const fetchKiosks = async () => {
+    try {
+      const res = await kioskApi.getAll();
+      if (res.data) setKiosks(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchLokers();
+    fetchKiosks();
   }, []);
 
+  // Otomatis buka modal cetak kunci jika ada target lokasi dari menu Kiosk
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const targetLokasi = searchParams.get('lokasi') || window.__targetPrintLocation;
+    if (targetLokasi) {
+      setPrintLocationFilter(targetLokasi);
+      setIsPrintLabelsOpen(true);
+      window.__targetPrintLocation = null;
+    }
+  }, []);
+
+  // Gabungkan seluruh lokasi dari loker yang ada dan seluruh anjungan kiosk terdaftar
   const uniqueLocations = useMemo(() => {
-    const locs = allLokers.map((l) => l.lokasi).filter(Boolean);
-    return Array.from(new Set(locs)).sort();
-  }, [allLokers]);
+    const lockerLocs = allLokers.map((l) => l.lokasi).filter(Boolean);
+    const kioskLocs = kiosks.map((k) => k.lokasi).filter(Boolean);
+    return Array.from(new Set([...lockerLocs, ...kioskLocs])).sort();
+  }, [allLokers, kiosks]);
 
   // Loker yang tampil di daftar pemilihan modal (filter zona & pencarian nomor)
   const modalFilteredLokers = useMemo(() => {
@@ -133,14 +158,14 @@ export default function TransaksiPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 font-hanken">
       {/* Header Sirkulasi Petugas */}
-      <div className="bg-gradient-to-r from-[#031633] via-[#1a2b49] to-[#031633] text-white rounded-3xl p-7 shadow-lg">
+      <div className="bg-gradient-to-r from-[#031633] via-[#1a2b49] to-[#031633] text-white rounded-3xl p-5 sm:p-7 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[#ffdcc0] text-xs font-bold mb-2 border border-white/15">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span>Meja Sirkulasi Pengembalian Kunci</span>
             </div>
-            <h2 className="font-editorial text-2xl sm:text-3xl font-bold">Scan QR Gantungan Kunci Loker</h2>
+            <h2 className="font-editorial text-xl sm:text-3xl font-bold">Scan QR Gantungan Kunci Loker</h2>
             <p className="text-xs text-[#d7e2ff] mt-1 max-w-lg">
               Bebas batas waktu pinjam. Denda hanya berlaku jika kunci hilang (laporkan ke petugas perpustakaan).
             </p>
@@ -257,19 +282,22 @@ export default function TransaksiPage() {
                 return (
                   <div
                     key={loker.id}
-                    className={`border rounded-2xl p-4 flex items-center justify-between transition-colors ${
-                      late
+                    className={`border rounded-2xl p-4 flex items-center justify-between transition-colors ${late
                         ? 'bg-rose-50/60 border-rose-300 hover:border-rose-400'
                         : 'bg-[#faf9f6] border-[#e3e2e0] hover:border-[#c5c6ce]'
-                    }`}
+                      }`}
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-black text-lg text-[#031633]">
                           {loker.nomor}
                         </span>
-                        <span className="text-[10px] font-bold text-rose-800 bg-rose-100/80 border border-rose-300 px-2 py-0.5 rounded-full">
-                          Not Available
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          loker.status === 'rusak'
+                            ? 'text-amber-800 bg-amber-100/90 border-amber-300'
+                            : 'text-rose-800 bg-rose-100/80 border-rose-300'
+                        }`}>
+                          {loker.status === 'rusak' ? 'Maintenance' : 'Terpakai'}
                         </span>
                       </div>
                       <p className="text-xs text-[#44474e] font-medium">
@@ -319,9 +347,9 @@ export default function TransaksiPage() {
 
           {/* Control Bar: Pencarian, Filter Zona, Status Pilihan & Tombol Cetak */}
           <div className="bg-[#faf9f6] p-3.5 rounded-2xl border border-[#e3e2e0] space-y-3 print:hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
               {/* Cari Nomor Loker */}
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative w-full sm:w-auto flex-1 min-w-[150px]">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#75777e]" />
                 <input
                   type="text"
@@ -336,14 +364,15 @@ export default function TransaksiPage() {
               <select
                 value={printLocationFilter}
                 onChange={(e) => setPrintLocationFilter(e.target.value)}
-                className="text-xs font-semibold bg-white border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden cursor-pointer"
+                className="w-full sm:w-auto text-xs font-semibold bg-white border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden cursor-pointer"
               >
                 <option value="semua">Semua Zona ({allLokers.length} Loker)</option>
                 {uniqueLocations.map((loc) => {
                   const countInLoc = allLokers.filter((l) => l.lokasi === loc).length;
+                  const matchingKiosk = kiosks.find((k) => k.lokasi === loc);
                   return (
                     <option key={loc} value={loc}>
-                      {loc} ({countInLoc} Loker)
+                      {loc} ({countInLoc} Loker){matchingKiosk ? ` — ${matchingKiosk.nama}` : ''}
                     </option>
                   );
                 })}
@@ -353,12 +382,12 @@ export default function TransaksiPage() {
               <button
                 onClick={handlePrintSelected}
                 disabled={selectedLokerIds.size === 0}
-                className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto justify-center px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Printer className="w-4 h-4 text-[#ffdcc0]" />
                 <span>
-                  {selectedLokerIds.size > 0 
-                    ? `Cetak ${selectedLokerIds.size} Stiker Terpilih` 
+                  {selectedLokerIds.size > 0
+                    ? `Cetak ${selectedLokerIds.size} Stiker Terpilih`
                     : 'Pilih Stiker Terlebih Dahulu'}
                 </span>
               </button>
@@ -401,8 +430,45 @@ export default function TransaksiPage() {
           {/* Interactive Selection Grid (Tampil di Layar Modal - Model Kartu ATM) */}
           <div className="print:hidden">
             {modalFilteredLokers.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#75777e] bg-[#faf9f6] rounded-2xl border border-[#e3e2e0]">
-                Tidak ada nomor loker yang sesuai dengan pencarian atau filter.
+              <div className="p-8 text-center text-xs text-[#75777e] bg-[#faf9f6] rounded-2xl border border-[#e3e2e0] space-y-3">
+                <p className="font-semibold text-stone-700">
+                  {printLocationFilter !== 'semua'
+                    ? `Belum ada loker fisik yang terdaftar di lokasi "${printLocationFilter}".`
+                    : 'Tidak ada nomor loker yang sesuai dengan pencarian atau filter.'}
+                </p>
+
+                {printLocationFilter !== 'semua' && (
+                  <div className="max-w-md mx-auto pt-2 space-y-2">
+                    <p className="text-[11px] text-stone-500">
+                      Anda dapat langsung membuat 50 unit loker otomatis untuk lokasi anjungan ini agar kuncinya siap dicetak:
+                    </p>
+                    <button
+                      type="button"
+                      disabled={isGeneratingForKiosk}
+                      onClick={async () => {
+                        try {
+                          setIsGeneratingForKiosk(true);
+                          const matchingKiosk = kiosks.find((k) => k.lokasi === printLocationFilter);
+                          if (matchingKiosk) {
+                            await kioskApi.generateLokers(matchingKiosk.id, { jumlah_loker: 50 });
+                          } else {
+                            alert('Anjungan belum terdaftar di database. Silakan buat di menu Kelola Kiosk.');
+                            return;
+                          }
+                          await fetchLokers();
+                          await fetchKiosks();
+                        } catch (err) {
+                          alert(err.message || 'Gagal membuat loker otomatis');
+                        } finally {
+                          setIsGeneratingForKiosk(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold rounded-xl text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingForKiosk ? 'Sedang Membuat 50 Loker...' : '+ Buat 50 Loker Otomatis untuk Lokasi Ini'}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 max-h-[55vh] overflow-y-auto p-1.5">
@@ -412,11 +478,10 @@ export default function TransaksiPage() {
                     <div
                       key={loker.id}
                       onClick={() => handleToggleLokerSelect(loker.id)}
-                      className={`relative rounded-2xl p-3.5 transition-all cursor-pointer select-none border-2 flex flex-col justify-between min-h-[148px] ${
-                        isSelected
+                      className={`relative rounded-2xl p-3.5 transition-all cursor-pointer select-none border-2 flex flex-col justify-between min-h-[148px] ${isSelected
                           ? 'bg-emerald-50/70 border-emerald-600 shadow-md ring-2 ring-emerald-600/30'
                           : 'bg-white border-[#c5c6ce] hover:border-[#031633] hover:shadow-2xs opacity-90 hover:opacity-100'
-                      }`}
+                        }`}
                     >
                       {/* Checkbox Indicator di pojok kanan atas */}
                       <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5">
@@ -424,11 +489,10 @@ export default function TransaksiPage() {
                           Kartu Kunci
                         </span>
                         <div
-                          className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black transition-colors ${
-                            isSelected
+                          className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black transition-colors ${isSelected
                               ? 'bg-emerald-600 text-white shadow-xs'
                               : 'border-2 border-[#c5c6ce] bg-white'
-                          }`}
+                            }`}
                         >
                           {isSelected && '✓'}
                         </div>
@@ -436,9 +500,9 @@ export default function TransaksiPage() {
 
                       {/* Header Kartu: Logo UNRI & Nama Kampus */}
                       <div className="flex items-center gap-2 border-b border-neutral-200 pb-1.5 pr-20">
-                        <img 
-                          src="/logo.png" 
-                          alt="Logo UNRI" 
+                        <img
+                          src="/logo.png"
+                          alt="Logo UNRI"
                           className="w-7 h-7 object-contain shrink-0"
                         />
                         <div className="min-w-0">
@@ -446,34 +510,38 @@ export default function TransaksiPage() {
                             UNIVERSITAS RIAU
                           </h4>
                           <p className="text-[8px] font-bold text-neutral-500 uppercase tracking-widest mt-0.5 leading-none">
-                            UPT PERPUSTAKAAN
+                            UPA PERPUSTAKAAN
                           </p>
                         </div>
                       </div>
 
-                      {/* Body Kartu: Nomor Loker di Kiri, QR Code di Kanan */}
-                      <div className="flex items-center justify-between gap-2 py-1.5">
-                        <div className="flex-1 min-w-0 space-y-0.5">
+                      {/* Body Kartu: Lubang di Kiri, Nomor Loker di Tengah, QR Code di Kanan */}
+                      <div className="flex items-center justify-between gap-1.5 py-1.5">
+                        {/* Indikator Lubang Ring Gantungan di Bagian Kiri */}
+                        <div className="flex items-center justify-center pl-0.5 pr-1 shrink-0">
+                          <div
+                            className="w-4 h-4 rounded-full border border-dashed border-neutral-400 flex items-center justify-center text-[7px] text-neutral-400"
+                            title="Posisi lubang ring gantungan kunci"
+                          >
+                            ○
+                          </div>
+                        </div>
+
+                        {/* Tengah: Nomor Loker & Tempat / Lokasi */}
+                        <div className="flex-1 min-w-0 flex flex-col items-center justify-center text-center px-1">
                           <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-500 block">
                             NOMOR LOKER
                           </span>
-                          <div className="text-3xl font-black font-mono text-[#031633] tracking-tight leading-none">
+                          <div className="text-4xl font-black font-mono text-[#031633] tracking-tight leading-none my-0.5">
                             {loker.nomor}
                           </div>
-                          <div className="text-[10px] font-semibold text-neutral-700 truncate pt-0.5 flex items-center gap-1">
+                          <div className="text-[10.5px] font-semibold text-neutral-700 truncate max-w-full flex items-center justify-center gap-1">
                             <MapPin className="w-3 h-3 text-[#8b500b] shrink-0" />
                             <span className="truncate">{loker.lokasi || 'Perpustakaan'}</span>
                           </div>
                         </div>
 
-                        {/* Indikator Lubang Ring Gantungan */}
-                        <div 
-                          className="w-4 h-4 rounded-full border border-dashed border-neutral-400 flex items-center justify-center text-[8px] text-neutral-400 shrink-0"
-                          title="Posisi lubang ring gantungan kunci"
-                        >
-                          ○
-                        </div>
-
+                        {/* Kanan: QR Code */}
                         <div className="flex flex-col items-center justify-center shrink-0 pl-1.5 border-l border-dashed border-neutral-300">
                           <div className="bg-white p-1 rounded-md border border-neutral-200">
                             <QRCodeSVG value={`LOKER:${loker.nomor}`} size={56} level="M" />
@@ -506,9 +574,9 @@ export default function TransaksiPage() {
                   {/* Header Kartu: Logo UNRI & Nama Kampus */}
                   <div className="flex items-center justify-between border-b-2 border-black pb-1">
                     <div className="flex items-center gap-1.5">
-                      <img 
-                        src="/logo.png" 
-                        alt="Logo UNRI" 
+                      <img
+                        src="/logo.png"
+                        alt="Logo UNRI"
                         className="w-6 h-6 object-contain shrink-0"
                       />
                       <div>
@@ -516,41 +584,40 @@ export default function TransaksiPage() {
                           UNIVERSITAS RIAU
                         </h4>
                         <p className="text-[7.5px] font-bold text-neutral-800 uppercase tracking-widest leading-none">
-                          UPT PERPUSTAKAAN
+                          UPA PERPUSTAKAAN
                         </p>
                       </div>
                     </div>
-                    
+
                     <span className="px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border border-black bg-white">
                       KARTU KUNCI LOKER
                     </span>
                   </div>
 
-                  {/* Body Kartu: Nomor Loker & QR Code */}
-                  <div className="flex items-center justify-between gap-2 my-auto py-1">
-                    {/* Kiri: Nomor Loker & Lokasi */}
-                    <div className="flex-1 space-y-0.5">
-                      <span className="text-[7.5px] font-bold uppercase tracking-wider text-neutral-600 block">
-                        NOMOR LOKER
-                      </span>
-                      <div className="text-3xl font-black font-mono text-black leading-none tracking-tight">
-                        {loker.nomor}
-                      </div>
-                      <div className="text-[8.5px] font-bold text-black truncate pt-0.5">
-                        📍 {loker.lokasi || 'Perpustakaan'}
-                      </div>
-                      <div className="text-[7px] text-neutral-800 leading-tight pt-0.5 font-medium">
-                        • Bebas batas waktu pinjam<br />
-                        • Denda hanya jika kunci hilang
+                  {/* Body Kartu: Lubang di Kiri, Nomor Loker di Tengah, QR Code di Kanan */}
+                  <div className="flex items-center justify-between gap-1.5 my-auto py-1">
+                    {/* Kiri: Indikator Lubang Ring Gantungan */}
+                    <div className="flex items-center justify-center pl-0.5 pr-1 shrink-0">
+                      <div
+                        className="w-3.5 h-3.5 rounded-full border border-dashed border-neutral-500 flex items-center justify-center text-[6px] text-neutral-500"
+                        title="Posisi lubang ring gantungan kunci"
+                      >
+                        ○
                       </div>
                     </div>
 
-                    {/* Indikator Lubang Ring Gantungan */}
-                    <div 
-                      className="w-3.5 h-3.5 rounded-full border border-dashed border-neutral-500 flex items-center justify-center text-[6px] text-neutral-500 shrink-0 mx-0.5"
-                      title="Posisi lubang ring gantungan kunci"
-                    >
-                      ○
+                    {/* Tengah: Nomor Loker & Lokasi */}
+                    <div className="flex-1 min-w-0 flex flex-col items-center justify-center text-center px-1">
+                      <span className="text-[7.5px] font-bold uppercase tracking-wider text-neutral-600 block leading-tight">
+                        NOMOR LOKER
+                      </span>
+                      <div className="text-[34px] font-black font-mono text-black leading-none tracking-tight my-0.5">
+                        {loker.nomor}
+                      </div>
+                      <div className="text-[9px] font-bold text-black truncate max-w-full flex items-center justify-center gap-0.5 pt-0.5">
+                        <span>📍</span>
+                        <span className="truncate">{loker.lokasi || 'Perpustakaan'}</span>
+                      </div>
                     </div>
 
                     {/* Kanan: QR Code */}
@@ -569,8 +636,8 @@ export default function TransaksiPage() {
 
                   {/* Footer Kartu */}
                   <div className="border-t border-black pt-0.5 flex justify-between items-center text-[6.5px] text-neutral-800 font-medium">
+                    <span>Bebas batas waktu pinjam</span>
                     <span>Milik Perpustakaan UNRI</span>
-                    <span>Kampus Bina Widya Km 12.5 Pekanbaru</span>
                   </div>
                 </div>
               ))}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
-import { lokerApi } from '../api';
+import { lokerApi, kioskApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { 
   Package, 
@@ -20,13 +20,6 @@ import {
   MapPin,
   Sparkles
 } from 'lucide-react';
-
-// Lokasi penempatan standar di perpustakaan
-const LOCATION_OPTIONS = [
-  'Lantai 1 - Sayap Kiri',
-  'Lantai 1 - Sayap Kanan',
-  'Sirkulasi'
-];
 
 /**
  * Helper untuk mendeteksi nomor loker terakhir dan merekomendasikan nomor berikutnya
@@ -73,43 +66,32 @@ export default function LokerManagePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
+  const [kiosks, setKiosks] = useState([]);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLoker, setEditingLoker] = useState(null);
   const [formData, setFormData] = useState({
     nomor: '',
-    lokasi: LOCATION_OPTIONS[0],
+    lokasi: 'Lantai 1 - Sayap Kiri',
     ukuran: 'sedang',
     catatan: ''
   });
   const [modalError, setModalError] = useState('');
 
-  // Nomor loker terakhir & rekomendasi berikutnya berdasarkan lokasi yang dipilih di modal
-  const locationSuggestion = useMemo(() => {
-    const targetLoc = formData.lokasi || LOCATION_OPTIONS[0];
-    const nomorsInLoc = lokers
-      .filter((l) => l.lokasi === targetLoc)
-      .map((l) => l.nomor);
-
-    const parsed = parseLockerNomor(nomorsInLoc);
-
-    if (!parsed.next) {
-      const defaultPrefix = targetLoc.toLowerCase().includes('kiri') ? 'A' : 'B';
-      return { last: null, next: `${defaultPrefix}-01` };
-    }
-    return parsed;
-  }, [lokers, formData.lokasi]);
-
-  // Nomor loker terakhir secara global di seluruh sistem
-  const globalSuggestion = useMemo(() => {
-    return parseLockerNomor(lokers.map((l) => l.nomor));
-  }, [lokers]);
-
   const fetchLokers = async () => {
     setLoading(true);
     try {
-      const res = await lokerApi.getAll();
-      if (res.data) setLokers(res.data);
+      const [res, kioskRes] = await Promise.allSettled([
+        lokerApi.getAll(),
+        kioskApi.getAll()
+      ]);
+      if (res.status === 'fulfilled' && res.value.data) {
+        setLokers(res.value.data);
+      }
+      if (kioskRes.status === 'fulfilled' && kioskRes.value.data) {
+        setKiosks(kioskRes.value.data);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -121,16 +103,54 @@ export default function LokerManagePage() {
     fetchLokers();
   }, []);
 
+  // Seluruh lokasi dinamis: gabungan dari loker yang ada, anjungan kiosk, serta standar lantai 1-3
+  const allLocations = useMemo(() => {
+    const fromLokers = lokers.map((l) => l.lokasi).filter(Boolean);
+    const fromKiosks = kiosks.map((k) => k.lokasi).filter(Boolean);
+    const defaultList = [
+      'Lantai 1 - Sayap Kiri',
+      'Lantai 1 - Sayap Kanan',
+      'Lantai 2 - Ruang Baca & Referensi',
+      'Lantai 2 - Ruang Digital & Tandon',
+      'Lantai 3 - Sirkulasi'
+    ];
+    return Array.from(new Set([...fromLokers, ...fromKiosks, ...defaultList])).sort();
+  }, [lokers, kiosks]);
+
+  // Nomor loker terakhir & rekomendasi berikutnya berdasarkan lokasi yang dipilih di modal
+  const locationSuggestion = useMemo(() => {
+    const targetLoc = formData.lokasi || allLocations[0] || 'Lantai 1 - Sayap Kiri';
+    const nomorsInLoc = lokers
+      .filter((l) => l.lokasi === targetLoc)
+      .map((l) => l.nomor);
+
+    const parsed = parseLockerNomor(nomorsInLoc);
+
+    if (!parsed.next) {
+      let defaultPrefix = 'E';
+      if (targetLoc.toLowerCase().includes('kiri')) defaultPrefix = 'A';
+      else if (targetLoc.toLowerCase().includes('kanan')) defaultPrefix = 'B';
+      else if (targetLoc.toLowerCase().includes('lantai 2')) defaultPrefix = 'C';
+      else if (targetLoc.toLowerCase().includes('lantai 3')) defaultPrefix = 'E';
+      return { last: null, next: `${defaultPrefix}-01` };
+    }
+    return parsed;
+  }, [lokers, formData.lokasi, allLocations]);
+
+  // Nomor loker terakhir secara global di seluruh sistem
+  const globalSuggestion = useMemo(() => {
+    return parseLockerNomor(lokers.map((l) => l.nomor));
+  }, [lokers]);
+
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedLocation, selectedStatus, pageSize]);
 
-  // Unique locations
+  // Unique locations for filter
   const uniqueLocations = useMemo(() => {
-    const locs = lokers.map((l) => l.lokasi).filter(Boolean);
-    return Array.from(new Set(locs)).sort();
-  }, [lokers]);
+    return allLocations;
+  }, [allLocations]);
 
   // Filtered Lokers
   const filteredLokers = useMemo(() => {
@@ -170,7 +190,7 @@ export default function LokerManagePage() {
     setEditingLoker(null);
     setFormData({
       nomor: '',
-      lokasi: LOCATION_OPTIONS[0],
+      lokasi: allLocations[0] || 'Lantai 1 - Sayap Kiri',
       ukuran: 'sedang',
       catatan: ''
     });
@@ -182,7 +202,7 @@ export default function LokerManagePage() {
     setEditingLoker(loker);
     setFormData({
       nomor: loker.nomor,
-      lokasi: loker.lokasi || LOCATION_OPTIONS[0],
+      lokasi: loker.lokasi || allLocations[0] || 'Lantai 1 - Sayap Kiri',
       ukuran: loker.ukuran,
       catatan: loker.catatan || ''
     });
@@ -251,25 +271,25 @@ export default function LokerManagePage() {
       </div>
 
       {/* Control Bar: Search & Filter Lokasi & Filter Status */}
-      <div className="bg-white rounded-2xl border border-[#e3e2e0] p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] p-3.5 sm:p-4 shadow-2xs flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative w-full sm:w-auto flex-1 min-w-[160px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#75777e]" />
           <input
             type="text"
-            placeholder="Cari nomor loker, lokasi penempatan, catatan..."
+            placeholder="Cari nomor loker, lokasi, catatan..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-xs bg-[#faf9f6] border border-[#c5c6ce] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] transition-all"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
           {/* Dropdown Filter Lokasi */}
           <select
             value={selectedLocation}
             onChange={(e) => setSelectedLocation(e.target.value)}
-            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+            className="flex-1 sm:flex-none text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-2.5 sm:px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
           >
             <option value="semua">📍 Semua Lokasi</option>
             {uniqueLocations.map((loc) => (
@@ -283,7 +303,7 @@ export default function LokerManagePage() {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+            className="flex-1 sm:flex-none text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-2.5 sm:px-3 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
           >
             <option value="semua">Semua Status</option>
             <option value="available">🟢 Available (Siap)</option>
@@ -296,12 +316,12 @@ export default function LokerManagePage() {
           <select
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
-            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-2.5 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer"
+            className="text-xs font-semibold bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-2.5 py-2 text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 cursor-pointer shrink-0"
             title="Jumlah baris per halaman"
           >
-            <option value={20}>20 baris</option>
-            <option value={50}>50 baris</option>
-            <option value={100}>100 baris</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
           </select>
         </div>
       </div>
@@ -477,17 +497,11 @@ export default function LokerManagePage() {
                 onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
                 className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b] cursor-pointer appearance-none"
               >
-                {LOCATION_OPTIONS.map((loc) => (
+                {allLocations.map((loc) => (
                   <option key={loc} value={loc}>
                     📍 {loc}
                   </option>
                 ))}
-                {/* Opsi data lama jika sedang mengedit loker di luar 2 lokasi utama */}
-                {formData.lokasi && !LOCATION_OPTIONS.includes(formData.lokasi) && (
-                  <option value={formData.lokasi}>
-                    📍 {formData.lokasi}
-                  </option>
-                )}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[#75777e]">
                 <ChevronDown className="w-4 h-4" />

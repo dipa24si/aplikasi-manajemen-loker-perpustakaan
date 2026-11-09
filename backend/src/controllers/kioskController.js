@@ -73,7 +73,7 @@ async function getKioskBySlug(req, res, next) {
  */
 async function createKiosk(req, res, next) {
   try {
-    const { nama, slug, lokasi, keterangan } = req.body;
+    const { nama, slug, lokasi, keterangan, init_lokers = true, jumlah_loker = 50, prefix_loker } = req.body;
 
     if (!nama || !slug || !lokasi) {
       return errorResponse(res, 'Nama anjungan, URL slug, dan lokasi penempatan wajib diisi.', 400);
@@ -103,10 +103,69 @@ async function createKiosk(req, res, next) {
       [nama.trim(), cleanSlug, lokasi.trim(), keterangan ? keterangan.trim() : null]
     );
 
+    let generatedCount = 0;
+    let assignedPrefix = null;
+
+    // Jika diminta buat loker otomatis (atau jika lokasi baru belum punya loker sama sekali)
+    if (init_lokers) {
+      // Cek apakah lokasi ini sudah punya loker
+      const [existingLokers] = await db.query(
+        'SELECT COUNT(*) as c FROM lokers WHERE LOWER(TRIM(lokasi)) = LOWER(TRIM(?))',
+        [lokasi.trim()]
+      );
+
+      if (existingLokers[0].c === 0) {
+        // Tentukan prefix huruf yang belum dipakai (A, B, C, D sudah dipakai -> E, F, dst.)
+        let chosenPrefix = prefix_loker ? prefix_loker.trim().toUpperCase() : null;
+        if (!chosenPrefix) {
+          const [usedRows] = await db.query(
+            "SELECT DISTINCT UPPER(SUBSTRING_INDEX(nomor, '-', 1)) as prefix FROM lokers WHERE nomor LIKE '%-%'"
+          );
+          const usedSet = new Set(usedRows.map(r => r.prefix));
+          const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+          for (const char of alphabet) {
+            if (!usedSet.has(char)) {
+              chosenPrefix = char;
+              break;
+            }
+          }
+          if (!chosenPrefix) chosenPrefix = 'K' + result.insertId;
+        }
+
+        assignedPrefix = chosenPrefix;
+        const totalToMake = Math.min(Math.max(parseInt(jumlah_loker, 10) || 50, 1), 200);
+        const lockerValues = [];
+
+        for (let i = 1; i <= totalToMake; i++) {
+          const numPad = totalToMake >= 100 ? String(i).padStart(3, '0') : String(i).padStart(2, '0');
+          const lockerNomor = `${chosenPrefix}-${numPad}`;
+          const lockerUkuran = i <= 10 ? 'besar' : 'sedang';
+          lockerValues.push([lockerNomor, lokasi.trim(), lockerUkuran, 'kosong', 'Kondisi baik']);
+        }
+
+        if (lockerValues.length > 0) {
+          await db.query(
+            'INSERT INTO lokers (nomor, lokasi, ukuran, status, catatan) VALUES ?',
+            [lockerValues]
+          );
+          generatedCount = lockerValues.length;
+        }
+      }
+    }
+
     return successResponse(
       res,
-      { id: result.insertId, nama, slug: cleanSlug, lokasi },
-      'Anjungan kiosk berhasil ditambahkan',
+      {
+        id: result.insertId,
+        nama,
+        slug: cleanSlug,
+        lokasi,
+        generated_lokers: generatedCount,
+        prefix_loker: assignedPrefix
+      },
+      generatedCount > 0
+        ? `Anjungan kiosk berhasil dibuat dan otomatis terhubung dengan ${generatedCount} loker (${assignedPrefix}-01 s/d ${assignedPrefix}-${String(generatedCount).padStart(2, '0')})`
+        : 'Anjungan kiosk berhasil ditambahkan',
       201
     );
   } catch (err) {
@@ -192,11 +251,75 @@ async function deleteKiosk(req, res, next) {
   }
 }
 
+/**
+ * Generate loker otomatis untuk anjungan kiosk yang belum memiliki loker
+ */
+async function generateLokersForKiosk(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { jumlah_loker = 50, prefix_loker } = req.body;
+
+    const [kioskRows] = await db.query('SELECT * FROM kiosks WHERE id = ?', [id]);
+    if (kioskRows.length === 0) {
+      return errorResponse(res, 'Anjungan kiosk tidak ditemukan.', 404);
+    }
+    const kiosk = kioskRows[0];
+
+    // Tentukan prefix huruf yang belum terpakai
+    let chosenPrefix = prefix_loker ? prefix_loker.trim().toUpperCase() : null;
+    if (!chosenPrefix) {
+      const [usedRows] = await db.query(
+        "SELECT DISTINCT UPPER(SUBSTRING_INDEX(nomor, '-', 1)) as prefix FROM lokers WHERE nomor LIKE '%-%'"
+      );
+      const usedSet = new Set(usedRows.map(r => r.prefix));
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      for (const char of alphabet) {
+        if (!usedSet.has(char)) {
+          chosenPrefix = char;
+          break;
+        }
+      }
+      if (!chosenPrefix) chosenPrefix = 'K' + kiosk.id;
+    }
+
+    const totalToMake = Math.min(Math.max(parseInt(jumlah_loker, 10) || 50, 1), 200);
+    const lockerValues = [];
+
+    for (let i = 1; i <= totalToMake; i++) {
+      const numPad = totalToMake >= 100 ? String(i).padStart(3, '0') : String(i).padStart(2, '0');
+      const lockerNomor = `${chosenPrefix}-${numPad}`;
+      const lockerUkuran = i <= 10 ? 'besar' : 'sedang';
+      lockerValues.push([lockerNomor, kiosk.lokasi, lockerUkuran, 'kosong', 'Kondisi baik']);
+    }
+
+    if (lockerValues.length > 0) {
+      await db.query(
+        'INSERT INTO lokers (nomor, lokasi, ukuran, status, catatan) VALUES ?',
+        [lockerValues]
+      );
+    }
+
+    return successResponse(
+      res,
+      {
+        count: lockerValues.length,
+        prefix: chosenPrefix,
+        lokasi: kiosk.lokasi
+      },
+      `Berhasil membuat ${lockerValues.length} loker (${chosenPrefix}-01 s/d ${chosenPrefix}-${String(lockerValues.length).padStart(2, '0')}) untuk ${kiosk.nama}`,
+      201
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAllKiosks,
   getKioskBySlug,
   createKiosk,
   updateKiosk,
-  deleteKiosk
+  deleteKiosk,
+  generateLokersForKiosk
 };
 

@@ -3,6 +3,12 @@ const { successResponse } = require('../utils/response');
 
 async function getStats(req, res, next) {
   try {
+    // Sinkronisasi otomatis: pulihkan loker 'terpakai' yang tidak memiliki peminjaman aktif
+    await db.query(
+      'UPDATE lokers l SET l.status = ? WHERE l.status = ? AND NOT EXISTS (SELECT 1 FROM peminjaman p WHERE p.loker_id = l.id AND p.status = ?)',
+      ['kosong', 'terpakai', 'aktif']
+    );
+
     // 1. Hitung statistik Loker
     const [lokerStats] = await db.query(`
       SELECT 
@@ -36,8 +42,8 @@ async function getStats(req, res, next) {
         l.ukuran AS ukuran_loker,
         COALESCE(a.member_name, p.member_id) AS nama_anggota,
         p.member_id,
-        COALESCE(a.fakultas, '-') AS fakultas,
-        COALESCE(a.prodi, '-') AS prodi,
+        COALESCE(a.member_instansi, '-') AS member_instansi,
+        COALESCE(a.inst_name, '-') AS inst_name,
         pt_pinjam.nama AS nama_petugas_pinjam,
         pt_kembali.nama AS nama_petugas_kembali
       FROM peminjaman p

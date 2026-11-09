@@ -16,7 +16,6 @@ async function searchAnggota(req, res, next) {
         a.member_name,
         a.member_type_id,
         a.member_email,
-        a.member_phone,
         a.expire_date,
         a.aktif,
         p.id AS active_loan_id,
@@ -67,7 +66,7 @@ async function getAnggotaById(req, res, next) {
 
 async function createAnggota(req, res, next) {
   try {
-    const { member_id, member_name, member_type_id = 'Reguler', member_phone, member_email, expire_date } = req.body;
+    const { member_id, member_name, member_type_id = 'Reguler', member_email, expire_date } = req.body;
 
     if (!member_id || !member_name) {
       return errorResponse(res, 'ID Anggota (NIM/NIK) dan Nama Lengkap wajib diisi.', 400);
@@ -81,9 +80,9 @@ async function createAnggota(req, res, next) {
     const defaultExpire = expire_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     await db.query(
-      `INSERT INTO anggota (member_id, member_name, member_type_id, member_phone, member_email, expire_date, aktif)
+      `INSERT INTO anggota (member_id, member_name, member_type_id, member_email, expire_date, aktif)
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [member_id.trim(), member_name.trim(), member_type_id, member_phone || null, member_email || null, defaultExpire]
+      [member_id.trim(), member_name.trim(), member_type_id, member_email || null, defaultExpire]
     );
 
     return successResponse(res, { member_id, member_name }, 'Anggota baru berhasil ditambahkan.', 201);

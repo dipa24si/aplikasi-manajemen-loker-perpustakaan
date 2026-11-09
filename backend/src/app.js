@@ -25,7 +25,7 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({
       status: 'error',
       db: 'disconnected',
-      message: err.message,
+      message: 'Koneksi ke server database terputus atau tidak dapat dijangkau.',
       timestamp: new Date().toISOString()
     });
   }

@@ -23,14 +23,14 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
       />
 
       {/* Modal Dialog Container: harus relative z-10 agar berada DI ATAS backdrop */}
-      <div className="relative z-10 flex min-h-full items-center justify-center p-4 text-center pointer-events-none">
+      <div className="relative z-10 flex min-h-full items-center justify-center p-2 sm:p-4 text-center pointer-events-none">
         <div 
-          className={`w-full ${maxWidth} pointer-events-auto transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-100`}
+          className={`w-full ${maxWidth} pointer-events-auto transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-100 max-h-[92vh] flex flex-col`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 sm:px-6 py-3.5 sm:py-4 shrink-0">
+            <h3 className="text-base sm:text-lg font-bold text-[#031633]">{title}</h3>
             <button
               type="button"
               onClick={onClose}
@@ -41,7 +41,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
           </div>
 
           {/* Body */}
-          <div className="px-6 py-5">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto">
             {children}
           </div>
         </div>

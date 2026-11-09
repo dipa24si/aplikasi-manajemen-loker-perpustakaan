@@ -19,6 +19,24 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Sensor pesan error agar tidak membocorkan IP internal server, port, atau error teknis database
+function sanitizeErrorMessage(msg) {
+  if (!msg || typeof msg !== 'string') {
+    return 'Terjadi kendala pada jaringan server. Silakan coba beberapa saat lagi.';
+  }
+
+  // Jika pesan mengandung format IP address (misal 172.16.x.x:24004 atau IP lainnya)
+  const hasIp = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b/.test(msg);
+  // Jika pesan mengandung error driver koneksi database
+  const isDbRefused = /ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|ENOTFOUND|ECONNRESET|PROTOCOL_CONNECTION_LOST|Network Error/i.test(msg);
+
+  if (hasIp || isDbRefused) {
+    return 'Koneksi ke server database terputus atau tidak dapat dijangkau. Silakan hubungi administrator.';
+  }
+
+  return msg;
+}
+
 // Interceptor Response: Handle 401 Unauthorized
 api.interceptors.response.use(
   (response) => response.data,
@@ -30,8 +48,9 @@ api.interceptors.response.use(
         window.dispatchEvent(new Event('auth:unauthorized'));
       }
     }
-    const message = error.response?.data?.message || error.message || 'Terjadi kesalahan pada jaringan';
-    return Promise.reject(new Error(message));
+    const rawMessage = error.response?.data?.message || error.message || 'Terjadi kesalahan pada jaringan';
+    const cleanMessage = sanitizeErrorMessage(rawMessage);
+    return Promise.reject(new Error(cleanMessage));
   }
 );
 

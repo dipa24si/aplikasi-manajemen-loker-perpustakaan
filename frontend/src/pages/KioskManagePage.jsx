@@ -14,10 +14,11 @@ import {
   Sparkles,
   ArrowRight,
   RefreshCw,
-  Info
+  Info,
+  Printer
 } from 'lucide-react';
 
-export default function KioskManagePage() {
+export default function KioskManagePage({ setActiveTab }) {
   const [kiosks, setKiosks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
@@ -28,10 +29,15 @@ export default function KioskManagePage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [availableLocations, setAvailableLocations] = useState([]);
   
-  // Custom Location & Floor State
+  // Custom Location & Floor State (Lantai 1 - 3 Perpustakaan)
   const [isCustomLocation, setIsCustomLocation] = useState(false);
   const [customLantai, setCustomLantai] = useState('1');
   const [customNamaArea, setCustomNamaArea] = useState('');
+
+  // Loker Generator State
+  const [initLokers, setInitLokers] = useState(true);
+  const [jumlahLoker, setJumlahLoker] = useState(50);
+  const [generatingKioskId, setGeneratingKioskId] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -94,31 +100,44 @@ export default function KioskManagePage() {
     fetchLocations();
   }, []);
 
+  // Helper untuk mengekstrak nama area murni tanpa prefix "Lantai X - "
+  const extractAreaName = (loc) => {
+    if (!loc) return '';
+    const match = loc.match(/Lantai\s*\d+\s*[-–—:]\s*(.*)/i);
+    if (match && match[1]) return match[1].trim();
+    return loc.trim();
+  };
+
   const openAddModal = () => {
     setEditingKiosk(null);
     const assigned = new Set(kiosks.map((k) => (k.lokasi || '').trim().toLowerCase()));
     const unassigned = availableLocations.filter((loc) => !assigned.has(loc.trim().toLowerCase()));
 
+    setInitLokers(true);
+    setJumlahLoker(50);
     if (unassigned.length > 0) {
+      const initLoc = unassigned[0];
+      const areaName = extractAreaName(initLoc);
+      const initNama = areaName ? `Peminjaman Loker ${areaName}` : 'Peminjaman Loker';
       setIsCustomLocation(false);
       setCustomLantai('1');
       setCustomNamaArea('');
       setFormData({
-        nama: '',
-        slug: '',
-        lokasi: unassigned[0],
+        nama: initNama,
+        slug: handleSlugAuto(areaName || initNama),
+        lokasi: initLoc,
         keterangan: '',
         aktif: 1
       });
     } else {
       // Jika semua lokasi sudah terpakai oleh anjungan lain, otomatis ke mode input sendiri
       setIsCustomLocation(true);
-      setCustomLantai('2');
-      setCustomNamaArea('');
+      setCustomLantai('3');
+      setCustomNamaArea('Sirkulasi');
       setFormData({
-        nama: '',
-        slug: '',
-        lokasi: 'Lantai 2 - Area Baru',
+        nama: 'Peminjaman Loker Sirkulasi',
+        slug: 'sirkulasi-lantai-3',
+        lokasi: 'Lantai 3 - Sirkulasi',
         keterangan: '',
         aktif: 1
       });
@@ -150,8 +169,10 @@ export default function KioskManagePage() {
   };
 
   const handleSlugAuto = (namaValue) => {
+    if (!namaValue) return '';
     const slug = namaValue
       .toLowerCase()
+      .replace(/^peminjaman\s+loker\s+/i, '')
       .replace(/^anjungan\s+/i, '')
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
@@ -190,12 +211,17 @@ export default function KioskManagePage() {
       setModalLoading(true);
       const payload = {
         ...formData,
-        lokasi: finalLokasi
+        lokasi: finalLokasi,
+        init_lokers: !editingKiosk && initLokers,
+        jumlah_loker: parseInt(jumlahLoker, 10) || 50
       };
       if (editingKiosk) {
         await kioskApi.update(editingKiosk.id, payload);
       } else {
-        await kioskApi.create(payload);
+        const res = await kioskApi.create(payload);
+        if (res.data && res.data.generated_lokers > 0) {
+          alert(`Berhasil! Anjungan dibuat dan otomatis terhubung dengan ${res.data.generated_lokers} loker (${res.data.prefix_loker}-01 s/d ${res.data.prefix_loker}-${String(res.data.generated_lokers).padStart(2, '0')}). Kuncinya kini siap dicetak di menu Sirkulasi Kunci.`);
+        }
       }
       setIsModalOpen(false);
       fetchKiosks();
@@ -205,6 +231,25 @@ export default function KioskManagePage() {
       alert(err.message || 'Gagal menyimpan anjungan kiosk');
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleGenerateLokers = async (kiosk) => {
+    if (!window.confirm(`Buat otomatis 50 unit loker baru untuk anjungan "${kiosk.nama}" di lokasi "${kiosk.lokasi}"?\n\nLoker ini akan langsung terhubung ke anjungan dan siap dicetak di menu Sirkulasi Kunci.`)) {
+      return;
+    }
+
+    try {
+      setGeneratingKioskId(kiosk.id);
+      const res = await kioskApi.generateLokers(kiosk.id, { jumlah_loker: 50 });
+      await fetchKiosks();
+      await fetchLocations();
+      alert(res.message || `Berhasil membuat 50 loker baru untuk anjungan ${kiosk.nama}!`);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Gagal membuat loker');
+    } finally {
+      setGeneratingKioskId(null);
     }
   };
 
@@ -246,19 +291,19 @@ export default function KioskManagePage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           <button
             onClick={fetchKiosks}
-            className="p-3 border border-stone-200 rounded-2xl hover:bg-stone-50 text-stone-600 transition-colors shadow-2xs"
+            className="p-2.5 sm:p-3 border border-stone-200 rounded-2xl hover:bg-stone-50 text-stone-600 transition-colors shadow-2xs cursor-pointer"
             title="Refresh Data"
           >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={openAddModal}
-            className="px-5 py-3 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold rounded-2xl transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+            className="px-4 sm:px-5 py-2.5 sm:py-3 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold rounded-2xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 text-xs sm:text-sm cursor-pointer"
           >
-            <Plus className="w-5 h-5 text-[#ffdcc0]" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-[#ffdcc0]" />
             <span>Tambah Anjungan Baru</span>
           </button>
         </div>
@@ -375,6 +420,26 @@ export default function KioskManagePage() {
                     </p>
                   )}
 
+                  {/* Banner Peringatan jika belum ada loker di lokasi anjungan ini */}
+                  {kiosk.total_lokers === 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span className="text-amber-800 font-medium">
+                          Belum ada loker terhubung di lokasi ini.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateLokers(kiosk)}
+                        disabled={generatingKioskId === kiosk.id}
+                        className="px-3 py-1.5 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold rounded-xl text-xs shadow-xs transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
+                      >
+                        {generatingKioskId === kiosk.id ? 'Membuat...' : '+ Buat 50 Loker'}
+                      </button>
+                    </div>
+                  )}
+
                   {/* URL Box */}
                   <div className="bg-blue-50/60 border border-blue-200/70 rounded-xl p-3 mb-5 flex items-center justify-between gap-2">
                     <div className="truncate font-mono text-xs text-blue-900">
@@ -402,33 +467,50 @@ export default function KioskManagePage() {
                 </div>
 
                 {/* Footer Action Buttons */}
-                <div className="pt-4 border-t border-stone-100 flex items-center justify-between gap-2">
+                <div className="pt-4 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditModal(kiosk)}
-                      className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-xl transition-colors"
+                      className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
                       title="Edit Anjungan"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(kiosk)}
-                      className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
+                      className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                       title="Hapus Anjungan"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <a
-                    href={`/${kiosk.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md"
-                  >
-                    <span>Buka Layar Kiosk</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-[#ffdcc0]" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.__targetPrintLocation = kiosk.lokasi;
+                        if (setActiveTab) {
+                          setActiveTab('transaksi');
+                        }
+                      }}
+                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-[#031633] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
+                      title="Buka Sirkulasi Kunci & Cetak Stiker/Kartu Kunci Loker Ini"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-[#8b500b]" />
+                      <span>Cetak Kunci</span>
+                    </button>
+
+                    <a
+                      href={`/${kiosk.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
+                    >
+                      <span>Buka Layar Kiosk</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-[#ffdcc0]" />
+                    </a>
+                  </div>
                 </div>
               </div>
             );
@@ -464,7 +546,7 @@ export default function KioskManagePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Anjungan Sirkulasi Lantai 2"
+                  placeholder="Contoh: Peminjaman Loker Sirkulasi"
                   value={formData.nama}
                   onChange={(e) => {
                     const namaVal = e.target.value;
@@ -491,7 +573,7 @@ export default function KioskManagePage() {
                   </span>
                   <input
                     type="text"
-                    placeholder="sirkulasi-lantai-2"
+                    placeholder="sirkulasi"
                     value={formData.slug}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-') })}
                     required
@@ -513,10 +595,23 @@ export default function KioskManagePage() {
                     onClick={() => {
                       const next = !isCustomLocation;
                       setIsCustomLocation(next);
-                      if (next && customNamaArea.trim()) {
-                        setFormData(prev => ({ ...prev, lokasi: `Lantai ${customLantai} - ${customNamaArea.trim()}` }));
-                      } else if (!next) {
-                        setFormData(prev => ({ ...prev, lokasi: availableLocations[0] || 'Lantai 1 - Sayap Kiri' }));
+                      if (next) {
+                        const areaTrim = customNamaArea.trim();
+                        setFormData(prev => ({
+                          ...prev,
+                          lokasi: `Lantai ${customLantai} - ${areaTrim}`,
+                          nama: !editingKiosk && areaTrim ? `Peminjaman Loker ${areaTrim}` : (!editingKiosk ? '' : prev.nama),
+                          slug: !editingKiosk && areaTrim ? handleSlugAuto(areaTrim) : (!editingKiosk ? '' : prev.slug)
+                        }));
+                      } else {
+                        const fallbackLoc = availableLocations[0] || 'Lantai 1 - Sayap Kiri';
+                        const area = extractAreaName(fallbackLoc);
+                        setFormData(prev => ({
+                          ...prev,
+                          lokasi: fallbackLoc,
+                          nama: !editingKiosk ? `Peminjaman Loker ${area}` : prev.nama,
+                          slug: !editingKiosk ? handleSlugAuto(area) : prev.slug
+                        }));
                       }
                     }}
                     className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
@@ -529,7 +624,21 @@ export default function KioskManagePage() {
                   selectableLocations.length > 0 ? (
                     <select
                       value={formData.lokasi}
-                      onChange={(e) => setFormData({ ...formData, lokasi: e.target.value })}
+                      onChange={(e) => {
+                        const nextLoc = e.target.value;
+                        const area = extractAreaName(nextLoc);
+                        const newNama = area ? `Peminjaman Loker ${area}` : 'Peminjaman Loker';
+                        setFormData(prev => ({
+                          ...prev,
+                          lokasi: nextLoc,
+                          nama: !editingKiosk && (!prev.nama || prev.nama.startsWith('Peminjaman Loker') || prev.nama.startsWith('Anjungan'))
+                            ? newNama
+                            : prev.nama,
+                          slug: !editingKiosk && (!prev.slug || prev.slug === handleSlugAuto(prev.nama))
+                            ? handleSlugAuto(area || newNama)
+                            : prev.slug
+                        }));
+                      }}
                       required
                       className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm bg-white font-medium text-stone-800"
                     >
@@ -568,8 +677,6 @@ export default function KioskManagePage() {
                           <option value="1">Lantai 1</option>
                           <option value="2">Lantai 2</option>
                           <option value="3">Lantai 3</option>
-                          <option value="4">Lantai 4</option>
-                          <option value="5">Lantai 5</option>
                         </select>
                       </div>
 
@@ -584,14 +691,16 @@ export default function KioskManagePage() {
                           onChange={(e) => {
                             const area = e.target.value;
                             setCustomNamaArea(area);
+                            const areaTrim = area.trim();
+                            const newNama = areaTrim ? `Peminjaman Loker ${areaTrim}` : '';
                             setFormData(prev => ({
                               ...prev,
-                              lokasi: `Lantai ${customLantai} - ${area.trim()}`,
-                              nama: !editingKiosk && (!prev.nama || prev.nama.startsWith('Anjungan'))
-                                ? `Anjungan Lantai ${customLantai} - ${area}`
+                              lokasi: `Lantai ${customLantai} - ${areaTrim}`,
+                              nama: !editingKiosk && (!prev.nama || prev.nama.startsWith('Peminjaman Loker') || prev.nama.startsWith('Anjungan'))
+                                ? newNama
                                 : prev.nama,
-                              slug: !editingKiosk && (!prev.slug || prev.slug.startsWith('lantai-'))
-                                ? `lantai-${customLantai}-${area.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')}`
+                              slug: !editingKiosk && (!prev.slug || prev.slug.startsWith('lantai-') || prev.slug.startsWith('peminjaman-') || prev.slug === handleSlugAuto(prev.nama))
+                                ? handleSlugAuto(areaTrim || newNama)
                                 : prev.slug
                             }));
                           }}
@@ -627,6 +736,50 @@ export default function KioskManagePage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm"
                 />
               </div>
+
+              {!editingKiosk && (
+                <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="initLokers"
+                      checked={initLokers}
+                      onChange={(e) => setInitLokers(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="initLokers" className="text-xs font-bold text-[#031633] block cursor-pointer">
+                        Otomatis Buat Loker Terhubung ({jumlahLoker} Unit)
+                      </label>
+                      <p className="text-[11px] text-stone-500 mt-0.5">
+                        Loker baru akan otomatis dibuat di lokasi anjungan ini sehingga siap digunakan mahasiswa dan kuncinya langsung terhubung untuk dicetak di menu Sirkulasi Kunci.
+                      </p>
+                    </div>
+                  </div>
+
+                  {initLokers && (
+                    <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between gap-3 text-xs">
+                      <span className="font-semibold text-stone-600">Kapasitas Loker Awal:</span>
+                      <div className="flex items-center gap-1.5">
+                        {[20, 30, 50].map((num) => (
+                          <button
+                            type="button"
+                            key={num}
+                            onClick={() => setJumlahLoker(num)}
+                            className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer text-xs ${
+                              jumlahLoker === num
+                                ? 'bg-[#031633] text-white shadow-2xs'
+                                : 'bg-white text-stone-700 border border-stone-300 hover:bg-stone-100'
+                            }`}
+                          >
+                            {num} Unit
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {editingKiosk && (
                 <div className="flex items-center gap-2 pt-2">

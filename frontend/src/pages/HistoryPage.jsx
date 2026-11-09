@@ -3,13 +3,13 @@ import Badge from '../components/common/Badge';
 import { historyApi } from '../api';
 import { formatDate, formatRupiah } from '../utils/formatters';
 import * as XLSX from 'xlsx';
-import { 
-  Search, 
-  Filter, 
-  Calendar, 
-  Download, 
-  Printer, 
-  ChevronLeft, 
+import {
+  Search,
+  Filter,
+  Calendar,
+  Download,
+  Printer,
+  ChevronLeft,
   ChevronRight,
   FileText,
   DollarSign,
@@ -143,7 +143,7 @@ export default function HistoryPage() {
             KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI
           </h3>
           <h2 className="text-base font-black uppercase tracking-wider text-slate-900">
-            UNIVERSITAS RIAU — UPT PERPUSTAKAAN
+            UNIVERSITAS RIAU — UPA PERPUSTAKAAN
           </h2>
           <p className="text-[10px] text-slate-600">
             Kampus Bina Widya Km. 12,5 Simpang Baru, Pekanbaru 28293 | Laman: perpus.unri.ac.id
@@ -171,17 +171,17 @@ export default function HistoryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2.5 px-3.5 sm:px-4 rounded-xl transition-colors shadow-2xs cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
-            <span>Ekspor Excel (.xlsx)</span>
+            <span>Ekspor Excel</span>
           </button>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold py-2.5 px-3.5 sm:px-4 rounded-xl transition-all shadow-2xs cursor-pointer"
           >
             <Printer className="w-4 h-4 text-[#ffdcc0]" />
             <span>Cetak Laporan</span>
@@ -190,23 +190,23 @@ export default function HistoryPage() {
       </div>
 
       {/* Filter Card Web (Disembunyikan saat cetak) */}
-      <div className="bg-white rounded-2xl border border-[#e3e2e0] p-4 shadow-2xs print:hidden space-y-3 font-hanken">
-        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[220px]">
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] p-3.5 sm:p-4 shadow-2xs print:hidden space-y-3 font-hanken">
+        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="relative w-full sm:w-auto flex-1 min-w-[160px]">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Cari nomor loker, nama, atau NIM..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            className="flex-1 sm:flex-none text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
           >
             <option value="semua">Semua Status</option>
             <option value="aktif">Sedang Dipinjam (Aktif)</option>
@@ -214,26 +214,26 @@ export default function HistoryPage() {
             <option value="kunci_hilang">Kunci Hilang</option>
           </select>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
             <span>Dari:</span>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-700"
             />
             <span>s/d</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-700"
             />
           </div>
 
           <button
             type="submit"
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+            className="px-4 py-2 bg-[#031633] hover:bg-[#1a2b49] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
             Terapkan
           </button>
@@ -346,7 +346,7 @@ export default function HistoryPage() {
           <div>
             <p>Pekanbaru, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             <p>Mengetahui,</p>
-            <p className="font-bold">Kepala UPT Perpustakaan UNRI</p>
+            <p className="font-bold">Kepala UPA Perpustakaan UNRI</p>
             <div className="h-12"></div>
             <p className="font-bold underline">( ............................................ )</p>
             <p className="text-[10px] text-slate-500">NIP.</p>
