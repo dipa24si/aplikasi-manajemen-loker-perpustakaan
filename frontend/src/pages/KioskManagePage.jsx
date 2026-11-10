@@ -15,7 +15,9 @@ import {
   ArrowRight,
   RefreshCw,
   Info,
-  Printer
+  Printer,
+  Minus,
+  MinusCircle
 } from 'lucide-react';
 
 export default function KioskManagePage({ setActiveTab }) {
@@ -38,6 +40,18 @@ export default function KioskManagePage({ setActiveTab }) {
   const [initLokers, setInitLokers] = useState(true);
   const [jumlahLoker, setJumlahLoker] = useState(50);
   const [generatingKioskId, setGeneratingKioskId] = useState(null);
+
+  // Kurangi Loker (Koreksi Typo) State
+  const [isReduceModalOpen, setIsReduceModalOpen] = useState(false);
+  const [reducingKiosk, setReducingKiosk] = useState(null);
+  const [reduceCount, setReduceCount] = useState(1);
+  const [reduceLoading, setReduceLoading] = useState(false);
+
+  // Tambah Loker Lanjutan State
+  const [isAddMoreModalOpen, setIsAddMoreModalOpen] = useState(false);
+  const [addMoreKiosk, setAddMoreKiosk] = useState(null);
+  const [addMoreCount, setAddMoreCount] = useState(10);
+  const [addMoreLoading, setAddMoreLoading] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -69,7 +83,8 @@ export default function KioskManagePage({ setActiveTab }) {
           'Lantai 1 - Sayap Kiri',
           'Lantai 1 - Sayap Kanan',
           'Lantai 2 - Ruang Baca & Referensi',
-          'Lantai 2 - Ruang Digital & Tandon'
+          'Lantai 2 - Ruang Digital & Tandon',
+          'Lantai 3 - Sirkulasi'
         ]);
       }
     } catch (err) {
@@ -235,21 +250,75 @@ export default function KioskManagePage({ setActiveTab }) {
   };
 
   const handleGenerateLokers = async (kiosk) => {
-    if (!window.confirm(`Buat otomatis 50 unit loker baru untuk anjungan "${kiosk.nama}" di lokasi "${kiosk.lokasi}"?\n\nLoker ini akan langsung terhubung ke anjungan dan siap dicetak di menu Sirkulasi Kunci.`)) {
+    openAddMoreModal(kiosk);
+  };
+
+  const openReduceModal = (kiosk) => {
+    setReducingKiosk(kiosk);
+    setReduceCount(1);
+    setIsReduceModalOpen(true);
+  };
+
+  const handleReduceSubmit = async (e) => {
+    e.preventDefault();
+    if (!reducingKiosk) return;
+
+    const countNum = parseInt(reduceCount, 10);
+    if (!countNum || countNum < 1) {
+      alert('Masukkan jumlah loker yang valid minimal 1 unit.');
+      return;
+    }
+
+    if (countNum > (reducingKiosk.available_lokers || 0)) {
+      alert(`Jumlah pengurangan (${countNum}) melebihi jumlah loker kosong (${reducingKiosk.available_lokers || 0}). Loker yang sedang dipinjam mahasiswa tidak dapat dihapus.`);
       return;
     }
 
     try {
-      setGeneratingKioskId(kiosk.id);
-      const res = await kioskApi.generateLokers(kiosk.id, { jumlah_loker: 50 });
+      setReduceLoading(true);
+      const res = await kioskApi.reduceLokers(reducingKiosk.id, { count: countNum });
+      alert(res.message || `Berhasil mengurangi ${countNum} unit loker dari ${reducingKiosk.nama}.`);
+      setIsReduceModalOpen(false);
+      setReducingKiosk(null);
       await fetchKiosks();
       await fetchLocations();
-      alert(res.message || `Berhasil membuat 50 loker baru untuk anjungan ${kiosk.nama}!`);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Gagal mengurangi jumlah loker');
+    } finally {
+      setReduceLoading(false);
+    }
+  };
+
+  const openAddMoreModal = (kiosk) => {
+    setAddMoreKiosk(kiosk);
+    setAddMoreCount(kiosk.total_lokers === 0 ? 50 : 10);
+    setIsAddMoreModalOpen(true);
+  };
+
+  const handleAddMoreSubmit = async (e) => {
+    e.preventDefault();
+    if (!addMoreKiosk) return;
+
+    const countNum = parseInt(addMoreCount, 10);
+    if (!countNum || countNum < 1) {
+      alert('Masukkan jumlah loker yang valid minimal 1 unit.');
+      return;
+    }
+
+    try {
+      setAddMoreLoading(true);
+      const res = await kioskApi.generateLokers(addMoreKiosk.id, { jumlah_loker: countNum });
+      alert(res.message || `Berhasil menambahkan ${countNum} unit loker untuk ${addMoreKiosk.nama}.`);
+      setIsAddMoreModalOpen(false);
+      setAddMoreKiosk(null);
+      await fetchKiosks();
+      await fetchLocations();
     } catch (err) {
       console.error(err);
       alert(err.message || 'Gagal membuat loker');
     } finally {
-      setGeneratingKioskId(null);
+      setAddMoreLoading(false);
     }
   };
 
@@ -411,6 +480,34 @@ export default function KioskManagePage({ setActiveTab }) {
                         style={{ width: `${availablePercent}%` }}
                       ></div>
                     </div>
+
+                    {/* Kelola Kapasitas Loker: Tambah & Kurang */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-200/60 text-[11px]">
+                      <span className="text-stone-500 font-semibold">Kapasitas:</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openAddMoreModal(kiosk)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold border border-blue-200 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs text-xs"
+                          title="Tambah kapasitas loker di lokasi ini"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Tambah</span>
+                        </button>
+
+                        {kiosk.total_lokers > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => openReduceModal(kiosk)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs text-xs"
+                            title="Kurangi kapasitas loker di lokasi ini"
+                          >
+                            <Minus className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Kurang</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Keterangan */}
@@ -431,11 +528,10 @@ export default function KioskManagePage({ setActiveTab }) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleGenerateLokers(kiosk)}
-                        disabled={generatingKioskId === kiosk.id}
-                        className="px-3 py-1.5 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold rounded-xl text-xs shadow-xs transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
+                        onClick={() => openAddMoreModal(kiosk)}
+                        className="px-3 py-1.5 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold rounded-xl text-xs shadow-xs transition-all cursor-pointer whitespace-nowrap"
                       >
-                        {generatingKioskId === kiosk.id ? 'Membuat...' : '+ Buat 50 Loker'}
+                        + Buat Loker
                       </button>
                     </div>
                   )}
@@ -520,28 +616,28 @@ export default function KioskManagePage({ setActiveTab }) {
 
       {/* MODAL TAMBAH / EDIT KIOSK */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-stone-100 space-y-6">
-            <div className="flex items-start justify-between border-b border-stone-100 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-5 shadow-2xl border border-stone-100 space-y-3.5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b border-stone-100 pb-2.5">
               <div>
-                <h3 className="font-newsreader text-2xl font-bold text-[#031633]">
+                <h3 className="font-newsreader text-lg sm:text-xl font-bold text-[#031633]">
                   {editingKiosk ? 'Edit Data Anjungan Kiosk' : 'Tambah Anjungan Kiosk Baru'}
                 </h3>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  Tentukan URL path dan lokasi loker yang akan dialokasikan oleh layar ini.
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Tentukan URL path dan lokasi loker yang dialokasikan layar ini.
                 </p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 text-stone-400 hover:text-stone-600 rounded-full hover:bg-stone-100"
+                className="p-1.5 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">
+                <label className="block text-xs font-bold text-stone-700 mb-1">
                   Nama Anjungan <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -559,16 +655,16 @@ export default function KioskManagePage({ setActiveTab }) {
                     }));
                   }}
                   required
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-xs sm:text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">
+                <label className="block text-xs font-bold text-stone-700 mb-1">
                   URL Path / Slug <span className="text-rose-500">*</span>
                 </label>
                 <div className="flex items-center">
-                  <span className="px-3 py-2.5 bg-stone-100 border border-r-0 border-stone-300 rounded-l-xl text-stone-500 text-xs font-mono">
+                  <span className="px-2.5 py-2 bg-stone-100 border border-r-0 border-stone-300 rounded-l-xl text-stone-500 text-[11px] font-mono shrink-0">
                     {window.location.origin}/
                   </span>
                   <input
@@ -577,16 +673,13 @@ export default function KioskManagePage({ setActiveTab }) {
                     value={formData.slug}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-') })}
                     required
-                    className="w-full px-4 py-2.5 rounded-r-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm font-mono"
+                    className="w-full px-3 py-2 rounded-r-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-xs sm:text-sm font-mono"
                   />
                 </div>
-                <p className="text-[11px] text-stone-400 mt-1">
-                  URL ini yang akan diketikkan di browser layar monitor kiosk.
-                </p>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-bold text-stone-700">
                     Lokasi Loker yang Dibaca <span className="text-rose-500">*</span>
                   </label>
@@ -614,9 +707,9 @@ export default function KioskManagePage({ setActiveTab }) {
                         }));
                       }
                     }}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
                   >
-                    {isCustomLocation ? '← Pilih dari Lokasi yang Ada' : '+ Tulis Nama & Lantai Sendiri'}
+                    {isCustomLocation ? '← Pilih Lokasi yang Ada' : '+ Tulis Lokasi Sendiri'}
                   </button>
                 </div>
 
@@ -640,7 +733,7 @@ export default function KioskManagePage({ setActiveTab }) {
                         }));
                       }}
                       required
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm bg-white font-medium text-stone-800"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-xs sm:text-sm bg-white font-medium text-stone-800"
                     >
                       {selectableLocations.map((loc) => (
                         <option key={loc} value={loc}>
@@ -649,16 +742,16 @@ export default function KioskManagePage({ setActiveTab }) {
                       ))}
                     </select>
                   ) : (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
-                      <p className="font-bold">Semua lokasi yang ada sudah memiliki anjungan kiosk.</p>
-                      <p className="mt-0.5 text-amber-700">
-                        Klik tombol <strong>"+ Tulis Nama & Lantai Sendiri"</strong> di atas untuk menambahkan lokasi baru.
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-xs text-amber-900">
+                      <p className="font-bold">Semua lokasi sudah memiliki anjungan.</p>
+                      <p className="mt-0.5 text-amber-700 text-[11px]">
+                        Klik <strong>"+ Tulis Lokasi Sendiri"</strong> untuk lokasi baru.
                       </p>
                     </div>
                   )
                 ) : (
-                  <div className="bg-stone-50 border border-stone-200/90 rounded-2xl p-3.5 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="bg-stone-50 border border-stone-200/90 rounded-xl p-3 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div>
                         <label className="block text-[11px] font-bold text-stone-600 mb-1">
                           Lantai <span className="text-rose-500">*</span>
@@ -672,7 +765,7 @@ export default function KioskManagePage({ setActiveTab }) {
                               setFormData(prev => ({ ...prev, lokasi: `Lantai ${l} - ${customNamaArea.trim()}` }));
                             }
                           }}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm bg-white font-medium"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-xs bg-white font-medium"
                         >
                           <option value="1">Lantai 1</option>
                           <option value="2">Lantai 2</option>
@@ -686,7 +779,7 @@ export default function KioskManagePage({ setActiveTab }) {
                         </label>
                         <input
                           type="text"
-                          placeholder="Contoh: Sayap Kiri / Sirkulasi / Ruang Baca"
+                          placeholder="Contoh: Sayap Kiri / Sirkulasi"
                           value={customNamaArea}
                           onChange={(e) => {
                             const area = e.target.value;
@@ -705,76 +798,92 @@ export default function KioskManagePage({ setActiveTab }) {
                             }));
                           }}
                           required={isCustomLocation}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm bg-white"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-xs bg-white"
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs pt-2 border-t border-stone-200">
-                      <span className="text-stone-500 font-medium">Hasil Format Lokasi:</span>
-                      <span className="font-bold text-[#031633] font-mono bg-white px-2.5 py-1 rounded-lg border border-stone-200 shadow-2xs">
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-stone-200">
+                      <span className="text-stone-500 font-medium">Hasil:</span>
+                      <span className="font-bold text-[#031633] font-mono bg-white px-2 py-0.5 rounded border border-stone-200">
                         {`Lantai ${customLantai} - ${customNamaArea.trim() || '...'}`}
                       </span>
                     </div>
                   </div>
                 )}
-
-                <p className="text-[11px] text-stone-400 mt-1.5">
-                  Mahasiswa yang memesan di anjungan ini otomatis hanya akan diberi kunci loker di lantai dan area ini.
-                </p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">
-                  Keterangan Tambahan (Opsional)
+                <label className="block text-xs font-bold text-stone-700 mb-1">
+                  Keterangan (Opsional)
                 </label>
                 <input
                   type="text"
                   placeholder="Contoh: Monitor layar sentuh sebelah pintu utama"
                   value={formData.keterangan}
                   onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-sm"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#031633] text-xs sm:text-sm"
                 />
               </div>
 
               {!editingKiosk && (
-                <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-start gap-3">
+                <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-3 space-y-2.5">
+                  <div className="flex items-center gap-2.5">
                     <input
                       type="checkbox"
                       id="initLokers"
                       checked={initLokers}
                       onChange={(e) => setInitLokers(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
-                    <div className="flex-1">
-                      <label htmlFor="initLokers" className="text-xs font-bold text-[#031633] block cursor-pointer">
-                        Otomatis Buat Loker Terhubung ({jumlahLoker} Unit)
-                      </label>
-                      <p className="text-[11px] text-stone-500 mt-0.5">
-                        Loker baru akan otomatis dibuat di lokasi anjungan ini sehingga siap digunakan mahasiswa dan kuncinya langsung terhubung untuk dicetak di menu Sirkulasi Kunci.
-                      </p>
-                    </div>
+                    <label htmlFor="initLokers" className="text-xs font-bold text-[#031633] cursor-pointer">
+                      Otomatis Buat Loker Terhubung ({jumlahLoker || 0} Unit)
+                    </label>
                   </div>
 
                   {initLokers && (
-                    <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between gap-3 text-xs">
-                      <span className="font-semibold text-stone-600">Kapasitas Loker Awal:</span>
-                      <div className="flex items-center gap-1.5">
-                        {[20, 30, 50].map((num) => (
-                          <button
-                            type="button"
-                            key={num}
-                            onClick={() => setJumlahLoker(num)}
-                            className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer text-xs ${
-                              jumlahLoker === num
-                                ? 'bg-[#031633] text-white shadow-2xs'
-                                : 'bg-white text-stone-700 border border-stone-300 hover:bg-stone-100'
-                            }`}
-                          >
-                            {num} Unit
-                          </button>
-                        ))}
+                    <div className="pt-2 border-t border-blue-200/60 space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <label htmlFor="customJumlahLoker" className="font-semibold text-xs text-[#031633]">
+                          Jumlah Loker Dibuat:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            id="customJumlahLoker"
+                            min="1"
+                            max="500"
+                            value={jumlahLoker}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setJumlahLoker(val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
+                            }}
+                            placeholder="50"
+                            className="w-20 bg-white border border-stone-300 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-center text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="font-semibold text-xs text-stone-500">Unit</span>
+                        </div>
+                      </div>
+
+                      {/* Tombol Cepat (Preset) */}
+                      <div className="flex items-center justify-between text-[11px] text-stone-500">
+                        <span>Pilihan Cepat:</span>
+                        <div className="flex items-center gap-1">
+                          {[10, 20, 30, 40, 50, 100].map((num) => (
+                            <button
+                              type="button"
+                              key={num}
+                              onClick={() => setJumlahLoker(num)}
+                              className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer text-[10px] ${
+                                Number(jumlahLoker) === num
+                                  ? 'bg-[#031633] text-white shadow-2xs'
+                                  : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
+                              }`}
+                            >
+                              {num}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -782,7 +891,7 @@ export default function KioskManagePage({ setActiveTab }) {
               )}
 
               {editingKiosk && (
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-2 pt-1">
                   <input
                     type="checkbox"
                     id="aktif"
@@ -796,20 +905,230 @@ export default function KioskManagePage({ setActiveTab }) {
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-100">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl text-stone-600 hover:bg-stone-100 text-sm font-semibold"
+                  className="px-4 py-2 rounded-xl text-stone-600 hover:bg-stone-100 text-xs font-semibold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={modalLoading}
-                  className="px-6 py-2.5 rounded-xl bg-[#031633] hover:bg-[#1a2b49] text-white text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold shadow-xs hover:shadow-md disabled:opacity-50 cursor-pointer"
                 >
-                  {modalLoading ? 'Menyimpan...' : editingKiosk ? 'Simpan Perubahan' : 'Tambah Anjungan'}
+                  {modalLoading ? 'Menyimpan...' : editingKiosk ? 'Simpan' : 'Tambah Anjungan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kurang Loker */}
+      {isReduceModalOpen && reducingKiosk && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-4 sm:p-5 shadow-2xl border border-stone-200 animate-in zoom-in-95 duration-150 font-hanken">
+            <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg">
+                  <Minus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[#031633]">
+                    Kurang Kapasitas Loker
+                  </h3>
+                  <p className="text-[11px] text-stone-500 truncate max-w-[200px]">
+                    {reducingKiosk.nama} ({reducingKiosk.lokasi})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReduceModalOpen(false);
+                  setReducingKiosk(null);
+                }}
+                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleReduceSubmit} className="space-y-3 pt-3">
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-2.5 text-xs space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-500">Total Kapasitas:</span>
+                  <span className="font-mono font-bold text-stone-800">{reducingKiosk.total_lokers} Unit</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-500">Loker Kosong:</span>
+                  <span className="font-mono font-bold text-emerald-700">{reducingKiosk.available_lokers || 0} Unit</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#031633] mb-1">
+                  Jumlah Loker yang Dikurangi:
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max={reducingKiosk.available_lokers || 1}
+                    value={reduceCount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setReduceCount(val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
+                    }}
+                    required
+                    className="w-full bg-[#faf9f6] border border-stone-300 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  />
+                  <span className="font-bold text-xs text-stone-500 shrink-0">Unit</span>
+                </div>
+                <div className="flex items-center gap-1 mt-1.5">
+                  {[1, 2, 5, 10, 20].map((num) => (
+                    num <= (reducingKiosk.available_lokers || 0) && (
+                      <button
+                        type="button"
+                        key={num}
+                        onClick={() => setReduceCount(num)}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold cursor-pointer border transition-colors ${
+                          Number(reduceCount) === num
+                            ? 'bg-amber-800 text-white border-amber-800'
+                            : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        -{num}
+                      </button>
+                    )
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-900 leading-relaxed">
+                Menghapus <b>{reduceCount || 0} unit loker kosong</b> nomor paling akhir di lokasi {reducingKiosk.lokasi}.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsReduceModalOpen(false);
+                    setReducingKiosk(null);
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-100 rounded-xl cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={reduceLoading || !reduceCount || reduceCount < 1}
+                  className="px-4 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  {reduceLoading ? 'Memproses...' : `Kurang ${reduceCount || 0} Loker`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tambah Loker */}
+      {isAddMoreModalOpen && addMoreKiosk && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-4 sm:p-5 shadow-2xl border border-stone-200 animate-in zoom-in-95 duration-150 font-hanken">
+            <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[#031633]">
+                    Tambah Kapasitas Loker
+                  </h3>
+                  <p className="text-[11px] text-stone-500 truncate max-w-[200px]">
+                    {addMoreKiosk.nama} ({addMoreKiosk.lokasi})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddMoreModalOpen(false);
+                  setAddMoreKiosk(null);
+                }}
+                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddMoreSubmit} className="space-y-3 pt-3">
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-2.5 text-xs flex justify-between items-center">
+                <span className="text-stone-500">Kapasitas Saat Ini:</span>
+                <span className="font-mono font-bold text-stone-800">{addMoreKiosk.total_lokers} Unit</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#031633] mb-1">
+                  Jumlah Loker yang Ditambahkan:
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={addMoreCount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAddMoreCount(val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
+                    }}
+                    required
+                    className="w-full bg-[#faf9f6] border border-stone-300 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <span className="font-bold text-xs text-stone-500 shrink-0">Unit</span>
+                </div>
+                <div className="flex items-center gap-1 mt-1.5">
+                  {[10, 20, 30, 50].map((num) => (
+                    <button
+                      type="button"
+                      key={num}
+                      onClick={() => setAddMoreCount(num)}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold cursor-pointer border transition-colors ${
+                        Number(addMoreCount) === num
+                          ? 'bg-[#031633] text-white border-[#031633]'
+                          : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      +{num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 text-[11px] text-blue-900 leading-relaxed">
+                Nomor loker otomatis melanjutkan nomor urut terakhir di lokasi ini.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddMoreModalOpen(false);
+                    setAddMoreKiosk(null);
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-100 rounded-xl cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={addMoreLoading || !addMoreCount || addMoreCount < 1}
+                  className="px-4 py-1.5 bg-[#031633] hover:bg-[#1a2b49] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  {addMoreLoading ? 'Menambahkan...' : `Tambah ${addMoreCount || 0} Loker`}
                 </button>
               </div>
             </form>

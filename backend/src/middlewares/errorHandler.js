@@ -13,6 +13,11 @@ function errorHandler(err, req, res, next) {
     return errorResponse(res, 'Data duplikat terdeteksi dalam sistem.', 409);
   }
 
+  // Handle MySQL Data Too Long
+  if (err.code === 'ER_DATA_TOO_LONG') {
+    return errorResponse(res, 'Panjang data input melebihi batas yang diizinkan sistem.', 400);
+  }
+
   // Handle MySQL Connection Failure / Server Mati / Jaringan Terputus
   const isDbConnectionError = 
     err.code === 'ECONNREFUSED' ||

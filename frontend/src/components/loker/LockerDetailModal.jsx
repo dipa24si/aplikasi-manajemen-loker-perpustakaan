@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Modal from '../common/Modal';
 import Badge from '../common/Badge';
+import { peminjamanApi } from '../../api';
 import { formatDate, formatTime, isOverdue } from '../../utils/formatters';
 import { 
   KeyRound, 
@@ -11,7 +12,8 @@ import {
   MapPin, 
   AlertTriangle,
   ArrowRightCircle,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function LockerDetailModal({ 
@@ -27,6 +29,12 @@ export default function LockerDetailModal({
   if (!isOpen || !loker) return null;
 
   const overdue = isOverdue(loker.batas_kembali, loker.status);
+  const isLostKey = Boolean(
+    loker.status === 'rusak' && (
+      loker.loan_status === 'kunci_hilang' || 
+      (loker.catatan && loker.catatan.toLowerCase().includes('kunci'))
+    )
+  );
 
   const handleToggleStatus = async (targetStatus) => {
     try {
@@ -35,6 +43,24 @@ export default function LockerDetailModal({
       onClose();
     } catch (err) {
       alert(err.message || 'Gagal mengubah status');
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  const handlePulihkanKunci = async () => {
+    try {
+      setStatusLoading(true);
+      await peminjamanApi.pulihkanKunci({
+        loker_id: loker.id,
+        nomor_loker: loker.nomor
+      });
+      onClose();
+      if (onUpdateStatus) {
+        onUpdateStatus(loker.id, 'kosong');
+      }
+    } catch (err) {
+      alert(err.message || 'Gagal memulihkan status kunci');
     } finally {
       setStatusLoading(false);
     }
@@ -78,6 +104,25 @@ export default function LockerDetailModal({
           </div>
         )}
 
+        {/* Banner Kunci Hilang Dilaporkan */}
+        {isLostKey && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 space-y-2 text-xs text-amber-950">
+            <div className="flex items-center gap-2 font-bold text-amber-900">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Status: Kunci Hilang Dilaporkan</span>
+            </div>
+            <p className="text-amber-800 text-[11px] leading-relaxed">
+              Loker ini saat ini tidak dapat dipinjamkan karena anak kunci dilaporkan hilang.
+              {loker.member_name ? ` Peminjam terakhir: ${loker.member_name} (${loker.member_id || '-'}).` : ''}
+            </p>
+            {loker.catatan && (
+              <p className="text-[11px] font-mono text-amber-900 bg-amber-100/70 px-2 py-1.5 rounded-lg border border-amber-200">
+                Catatan: {loker.catatan}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Borrower Section if Occupied */}
         {loker.status === 'terpakai' && (
           <div className="space-y-3">
@@ -96,16 +141,16 @@ export default function LockerDetailModal({
                 <span className="text-[#75777e]">ID / NIM</span>
                 <span className="font-mono font-bold text-[#031633]">{loker.member_id}</span>
               </div>
-              {loker.fakultas && (
+              {(loker.member_instansi || loker.fakultas) && (loker.member_instansi !== '-' || loker.fakultas) && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#75777e]">Fakultas</span>
-                  <span className="font-semibold text-[#031633]">{loker.fakultas}</span>
+                  <span className="text-[#75777e]">Fakultas / Instansi</span>
+                  <span className="font-semibold text-[#031633]">{loker.member_instansi || loker.fakultas}</span>
                 </div>
               )}
-              {loker.prodi && (
+              {(loker.inst_name || loker.prodi) && (loker.inst_name !== '-' || loker.prodi) && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#75777e]">Program Studi</span>
-                  <span className="font-semibold text-[#031633]">{loker.prodi}</span>
+                  <span className="text-[#75777e]">Program Studi / Unit</span>
+                  <span className="font-semibold text-[#031633]">{loker.inst_name || loker.prodi}</span>
                 </div>
               )}
               {loker.member_type_id && (
@@ -146,6 +191,18 @@ export default function LockerDetailModal({
 
         {/* Action Buttons */}
         <div className="pt-2 flex flex-col gap-2">
+          {/* Tombol Kunci Sudah Dikembalikan / Pulihkan Kunci */}
+          {isLostKey && (
+            <button
+              disabled={statusLoading}
+              onClick={handlePulihkanKunci}
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all text-xs cursor-pointer disabled:opacity-50"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-200" />
+              <span>Kunci Sudah Dikembalikan (Kunci Aman & Siap)</span>
+            </button>
+          )}
+
           {loker.status === 'kosong' && (
             <button
               onClick={() => {

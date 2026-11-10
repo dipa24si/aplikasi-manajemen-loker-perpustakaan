@@ -81,7 +81,7 @@ async function createAnggota(req, res, next) {
 
     await db.query(
       `INSERT INTO anggota (member_id, member_name, member_type_id, member_email, expire_date, aktif)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+       VALUES (?, ?, ?, ?, ?, 1)`,
       [member_id.trim(), member_name.trim(), member_type_id, member_email || null, defaultExpire]
     );
 

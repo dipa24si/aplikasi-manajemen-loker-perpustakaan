@@ -244,9 +244,7 @@ async function kembali(req, res, next) {
 
     if (qr_code) {
       let cleaned = qr_code.trim();
-      if (cleaned.startsWith('LOKER:')) {
-        cleaned = cleaned.replace('LOKER:', '').trim();
-      }
+      cleaned = cleaned.replace(/^loker:\s*/i, '').trim();
       nomor_loker = cleaned;
     }
 
@@ -278,22 +276,87 @@ async function kembali(req, res, next) {
       const [foundLoans] = await connection.query(findQuery, findParams);
 
       if (foundLoans.length === 0) {
-        // Cek apakah loker ini berstatus 'terpakai' namun peminjamannya tidak aktif (data tidak sinkron)
+        // 1. Cek apakah ada riwayat kunci hilang (kunci_hilang) untuk loker ini yang sekarang dikembalikan
+        const [lostLoans] = await connection.query(
+          `SELECT p.*, l.nomor AS nomor_loker, a.member_name 
+           FROM peminjaman p 
+           JOIN lokers l ON l.id = p.loker_id
+           LEFT JOIN v_anggota a ON a.member_id = p.member_id
+           WHERE (l.nomor = ? OR l.nomor = ? OR l.id = ?) AND p.status = 'kunci_hilang'
+           ORDER BY p.id DESC
+           LIMIT 1`,
+          [nomor_loker ? nomor_loker.trim() : null, nomor_loker ? nomor_loker.replace('LOKER:', '').trim() : null, loker_id || null]
+        );
+
+        if (lostLoans.length > 0) {
+          const lostLoan = lostLoans[0];
+          await connection.beginTransaction();
+          await connection.query(
+            `UPDATE peminjaman 
+             SET status = 'selesai', 
+                 tanggal_kembali = NOW(), 
+                 denda = 0, 
+                 catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci yang sempat dilaporkan hilang telah dikembalikan. Kondisi kunci aman.'),
+                 petugas_kembali_id = ?
+             WHERE id = ?`,
+            [petugas_kembali_id, lostLoan.id]
+          );
+          await connection.query(
+            'UPDATE lokers SET status = "kosong", catatan = "Kondisi aman (kunci telah dikembalikan)" WHERE id = ?',
+            [lostLoan.loker_id]
+          );
+          await connection.commit();
+
+          return successResponse(
+            res,
+            {
+              peminjaman_id: lostLoan.id,
+              nomor_loker: lostLoan.nomor_loker,
+              member_name: lostLoan.member_name,
+              status: 'selesai',
+              status_loker: 'available',
+              is_recovered: true,
+              catatan_loker: 'Kondisi aman (kunci telah dikembalikan)'
+            },
+            `Kunci loker ${lostLoan.nomor_loker} (${lostLoan.member_name}) yang sebelumnya dilaporkan hilang telah berhasil diterima kembali! Status kunci sekarang AMAN dan loker kembali AVAILABLE.`
+          );
+        }
+
+        // 2. Cek apakah fisik loker berstatus 'rusak' dengan catatan kunci hilang
         if (loker_id || nomor_loker) {
-          const [orphanLoker] = await connection.query(
-            'SELECT id, nomor, status FROM lokers WHERE id = ? OR nomor = ?',
+          const [lostLoker] = await connection.query(
+            'SELECT id, nomor, status, catatan FROM lokers WHERE id = ? OR nomor = ?',
             [loker_id || null, nomor_loker ? nomor_loker.trim() : null]
           );
-          if (orphanLoker.length > 0 && orphanLoker[0].status === 'terpakai') {
-            await connection.query('UPDATE lokers SET status = "kosong" WHERE id = ?', [orphanLoker[0].id]);
+          if (lostLoker.length > 0 && (lostLoker[0].status === 'rusak' || (lostLoker[0].catatan && lostLoker[0].catatan.toLowerCase().includes('kunci')))) {
+            await connection.query(
+              'UPDATE lokers SET status = "kosong", catatan = "Kondisi aman (kunci telah dikembalikan)" WHERE id = ?',
+              [lostLoker[0].id]
+            );
             return successResponse(
               res,
-              { loker_nomor: orphanLoker[0].nomor, status: 'kosong' },
-              `Loker ${orphanLoker[0].nomor} tidak memiliki peminjam aktif dan telah otomatis di-reset menjadi Available.`
+              {
+                nomor_loker: lostLoker[0].nomor,
+                status: 'kosong',
+                status_loker: 'available',
+                is_recovered: true,
+                catatan_loker: 'Kondisi aman (kunci telah dikembalikan)'
+              },
+              `Kunci loker ${lostLoker[0].nomor} telah diterima kembali! Status kunci sekarang AMAN dan loker kembali AVAILABLE.`
+            );
+          }
+
+          // 3. Cek apakah loker ini berstatus 'terpakai' namun peminjamannya tidak aktif (data tidak sinkron)
+          if (lostLoker.length > 0 && lostLoker[0].status === 'terpakai') {
+            await connection.query('UPDATE lokers SET status = "kosong" WHERE id = ?', [lostLoker[0].id]);
+            return successResponse(
+              res,
+              { loker_nomor: lostLoker[0].nomor, status: 'kosong' },
+              `Loker ${lostLoker[0].nomor} tidak memiliki peminjam aktif dan telah otomatis di-reset menjadi Available.`
             );
           }
         }
-        return errorResponse(res, `Tidak ditemukan peminjaman aktif untuk kunci loker "${nomor_loker || loker_id || member_id}".`, 404);
+        return errorResponse(res, `Tidak ditemukan peminjaman aktif atau laporan kunci hilang untuk kunci loker "${nomor_loker || loker_id || member_id}".`, 404);
       }
       targetLoanId = foundLoans[0].id;
     }
@@ -303,7 +366,7 @@ async function kembali(req, res, next) {
        FROM peminjaman p
        JOIN lokers l ON l.id = p.loker_id
        LEFT JOIN v_anggota a ON a.member_id = p.member_id
-       WHERE p.id = ? AND p.status = "aktif"
+       WHERE p.id = ? AND (p.status = 'aktif' OR p.status = 'kunci_hilang')
        FOR UPDATE`,
       [targetLoanId]
     );
@@ -313,16 +376,50 @@ async function kembali(req, res, next) {
     }
 
     const loan = loans[0];
+
+    // Jika pinjaman yang dipilih berstatus 'kunci_hilang' dan sekarang dikembalikan
+    if (loan.status === 'kunci_hilang') {
+      await connection.beginTransaction();
+      await connection.query(
+        `UPDATE peminjaman 
+         SET status = 'selesai', 
+             tanggal_kembali = NOW(), 
+             denda = 0, 
+             catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci yang sempat dilaporkan hilang telah dikembalikan. Kondisi kunci aman.'),
+             petugas_kembali_id = ?
+         WHERE id = ?`,
+        [petugas_kembali_id, loan.id]
+      );
+      await connection.query(
+        'UPDATE lokers SET status = "kosong", catatan = "Kondisi aman (kunci telah dikembalikan)" WHERE id = ?',
+        [loan.loker_id]
+      );
+      await connection.commit();
+
+      return successResponse(
+        res,
+        {
+          peminjaman_id: loan.id,
+          nomor_loker: loan.nomor_loker,
+          member_name: loan.member_name,
+          status: 'selesai',
+          status_loker: 'available',
+          is_recovered: true,
+          catatan_loker: 'Kondisi aman (kunci telah dikembalikan)'
+        },
+        `Kunci loker ${loan.nomor_loker} (${loan.member_name}) yang sebelumnya dilaporkan hilang telah berhasil dikembalikan! Status kunci sekarang AMAN dan loker kembali AVAILABLE.`
+      );
+    }
     const finalStatus = status === 'kunci_hilang' ? 'kunci_hilang' : 'selesai';
     const newLokerStatus = finalStatus === 'kunci_hilang' ? 'rusak' : 'kosong';
 
-    // Denda HANYA berlaku jika kunci hilang (tidak ada denda keterlambatan)
+    // Denda HANYA berlaku jika kunci hilang (nominal diinput manual oleh petugas)
     let totalDendaFinal = 0;
     if (finalStatus === 'kunci_hilang') {
       if (denda !== undefined && denda !== null && denda !== '') {
         totalDendaFinal = parseFloat(denda) || 0;
       } else {
-        totalDendaFinal = 25000; // Biaya standar penggantian anak kunci hilang
+        totalDendaFinal = 0; // Input manual oleh petugas (default 0 jika tidak diisi)
       }
     } else {
       totalDendaFinal = 0; // Pengembalian normal selalu bebas denda
@@ -342,7 +439,7 @@ async function kembali(req, res, next) {
     );
 
     await connection.query(
-      'UPDATE lokers SET status = ?, catatan = CASE WHEN ? = "kunci_hilang" THEN "Kunci hilang dilaporkan" ELSE NULL END WHERE id = ?',
+      'UPDATE lokers SET status = ?, catatan = CASE WHEN ? = "kunci_hilang" THEN "Kunci hilang dilaporkan" ELSE catatan END WHERE id = ?',
       [newLokerStatus, finalStatus, loan.loker_id]
     );
 
@@ -378,9 +475,7 @@ async function getActiveLoan(req, res, next) {
 
     if (qr_code) {
       let cleaned = qr_code.trim();
-      if (cleaned.startsWith('LOKER:')) {
-        cleaned = cleaned.replace('LOKER:', '').trim();
-      }
+      cleaned = cleaned.replace(/^loker:\s*/i, '').trim();
       nomor_loker = cleaned;
     }
 
@@ -423,6 +518,52 @@ async function getActiveLoan(req, res, next) {
     const [rows] = await db.query(query, params);
 
     if (rows.length === 0) {
+      // Periksa apakah ada catatan peminjaman dengan status 'kunci_hilang' untuk loker atau member ini
+      let lostQuery = `
+        SELECT 
+          p.*,
+          l.nomor AS nomor_loker,
+          l.lokasi,
+          l.ukuran,
+          l.status AS status_loker,
+          l.catatan AS catatan_loker,
+          a.member_name,
+          COALESCE(a.member_instansi, '-') AS member_instansi,
+          COALESCE(a.inst_name, '-') AS inst_name,
+          a.member_type_id,
+          a.member_email,
+          pt.nama AS nama_petugas_pinjam,
+          1 AS is_lost_key
+        FROM peminjaman p
+        JOIN lokers l ON l.id = p.loker_id
+        LEFT JOIN v_anggota a ON a.member_id = p.member_id
+        LEFT JOIN petugas pt ON pt.id = p.petugas_pinjam_id
+        WHERE p.status = 'kunci_hilang'
+      `;
+      const lostParams = [];
+      if (loker_id) {
+        lostQuery += ' AND p.loker_id = ?';
+        lostParams.push(loker_id);
+      } else if (nomor_loker) {
+        lostQuery += ' AND (l.nomor = ? OR l.nomor = ?)';
+        lostParams.push(nomor_loker.trim(), nomor_loker.replace('LOKER:', '').trim());
+      } else if (member_id) {
+        lostQuery += ' AND p.member_id = ?';
+        lostParams.push(member_id.trim());
+      }
+      lostQuery += ' ORDER BY p.id DESC LIMIT 1';
+
+      const [lostRows] = await db.query(lostQuery, lostParams);
+
+      if (lostRows.length > 0) {
+        return successResponse(res, {
+          ...lostRows[0],
+          is_lost_key: true,
+          hari_terlambat: 0,
+          estimasi_denda: parseFloat(lostRows[0].denda) || 0
+        }, 'Data peminjaman dengan status Kunci Hilang ditemukan');
+      }
+
       return successResponse(res, null, 'Tidak ada peminjaman aktif');
     }
 
@@ -440,9 +581,94 @@ async function getActiveLoan(req, res, next) {
   }
 }
 
+/**
+ * Pulihkan kunci hilang secara langsung (kunci telah dikembalikan / diganti baru, status loker dan kunci aman)
+ */
+async function pulihkanKunciHilang(req, res, next) {
+  const connection = await db.getConnection();
+  try {
+    const { loker_id, nomor_loker, peminjaman_id, catatan } = req.body;
+    const petugas_id = req.user ? req.user.id : null;
+
+    let targetLokerId = loker_id;
+    let targetNomor = nomor_loker;
+
+    if (!targetLokerId && peminjaman_id) {
+      const [loanRow] = await connection.query('SELECT loker_id FROM peminjaman WHERE id = ?', [peminjaman_id]);
+      if (loanRow.length > 0) targetLokerId = loanRow[0].loker_id;
+    }
+
+    if (!targetLokerId && targetNomor) {
+      const [lokerRow] = await connection.query('SELECT id FROM lokers WHERE nomor = ?', [targetNomor.trim()]);
+      if (lokerRow.length > 0) targetLokerId = lokerRow[0].id;
+    }
+
+    if (!targetLokerId) {
+      return errorResponse(res, 'Sertakan loker_id, nomor_loker, atau peminjaman_id', 400);
+    }
+
+    const [lokerRows] = await connection.query('SELECT id, nomor, status, catatan FROM lokers WHERE id = ?', [targetLokerId]);
+    if (lokerRows.length === 0) {
+      return errorResponse(res, 'Loker tidak ditemukan', 404);
+    }
+    const currentLoker = lokerRows[0];
+
+    // Ambil peminjaman terakhir berstatus kunci_hilang untuk loker ini (jika ada)
+    const [lostLoans] = await connection.query(
+      `SELECT p.id, p.member_id, a.member_name 
+       FROM peminjaman p
+       LEFT JOIN v_anggota a ON a.member_id = p.member_id
+       WHERE p.loker_id = ? AND p.status = 'kunci_hilang'
+       ORDER BY p.id DESC
+       LIMIT 1`,
+      [targetLokerId]
+    );
+
+    await connection.beginTransaction();
+
+    const noteToSet = catatan ? catatan.trim() : 'Kondisi aman (kunci telah dikembalikan)';
+
+    if (lostLoans.length > 0) {
+      await connection.query(
+        `UPDATE peminjaman 
+         SET status = 'selesai', 
+             tanggal_kembali = NOW(), 
+             denda = 0, 
+             catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci yang sempat dilaporkan hilang telah dikembalikan. Kondisi kunci aman.'),
+             petugas_kembali_id = ?
+         WHERE id = ?`,
+        [petugas_id, lostLoans[0].id]
+      );
+    }
+
+    await connection.query(
+      'UPDATE lokers SET status = "kosong", catatan = ? WHERE id = ?',
+      [noteToSet, targetLokerId]
+    );
+
+    await connection.commit();
+
+    return successResponse(res, {
+      loker_id: targetLokerId,
+      nomor_loker: currentLoker.nomor,
+      status: 'kosong',
+      catatan: noteToSet,
+      peminjaman_id: lostLoans.length > 0 ? lostLoans[0].id : null,
+      member_name: lostLoans.length > 0 ? lostLoans[0].member_name : null,
+      is_recovered: true
+    }, `Kunci loker ${currentLoker.nomor} berhasil dipulihkan. Kunci telah dikembalikan, status sekarang AMAN dan loker AVAILABLE.`);
+  } catch (err) {
+    await connection.rollback();
+    next(err);
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   mandiriPinjam,
   pinjam,
   kembali,
-  getActiveLoan
+  getActiveLoan,
+  pulihkanKunciHilang
 };

@@ -13,6 +13,7 @@ export default function QuickPinjamModal({
   const [selectedLokerId, setSelectedLokerId] = useState(loker?.id || '');
   const [memberQuery, setMemberQuery] = useState('');
   const [member, setMember] = useState(null);
+  const [candidateList, setCandidateList] = useState([]);
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,29 +42,44 @@ export default function QuickPinjamModal({
     if (!isOpen) {
       setMemberQuery('');
       setMember(null);
+      setCandidateList([]);
       setError('');
       setCatatan('');
     }
   }, [isOpen]);
+
+  const selectCandidate = (cand) => {
+    if (!cand.aktif) {
+      setError(`Anggota ${cand.member_name} tidak aktif atau masa berlaku habis.`);
+      setMember(null);
+      return;
+    }
+    if (cand.active_loan_id) {
+      setError(`Anggota ${cand.member_name} saat ini sedang meminjam loker ${cand.active_loker_nomor}.`);
+      setMember(null);
+      return;
+    }
+    setMember(cand);
+    setCandidateList([]);
+    setError('');
+  };
 
   const handleSearchMember = async (queryToSearch) => {
     const q = queryToSearch || memberQuery;
     if (!q.trim()) return;
 
     setError('');
+    setMember(null);
+    setCandidateList([]);
     setSearching(true);
     try {
       const res = await anggotaApi.search(q.trim());
       if (res.data && res.data.length > 0) {
-        const found = res.data[0];
-        if (!found.aktif) {
-          setError(`Anggota ${found.member_name} tidak aktif atau masa berlaku habis.`);
-          setMember(null);
-        } else if (found.active_loan_id) {
-          setError(`Anggota ${found.member_name} saat ini sedang meminjam loker ${found.active_loker_nomor}.`);
-          setMember(null);
+        if (res.data.length === 1) {
+          selectCandidate(res.data[0]);
         } else {
-          setMember(found);
+          // Jika ada beberapa hasil yang cocok, tampilkan daftar pilihan kepada petugas
+          setCandidateList(res.data);
         }
       } else {
         setError(`Anggota dengan kata kunci "${q}" tidak ditemukan.`);
@@ -182,27 +198,76 @@ export default function QuickPinjamModal({
           </div>
         </div>
 
+        {/* Daftar Hasil Pencarian (Jika ditemukan lebih dari 1 mahasiswa) */}
+        {candidateList.length > 0 && !member && (
+          <div className="bg-[#faf9f6] border border-[#c5c6ce] rounded-xl p-2.5 space-y-1.5 max-h-48 overflow-y-auto">
+            <p className="text-[11px] font-bold text-[#75777e] px-1">
+              Ditemukan {candidateList.length} mahasiswa, klik untuk memilih:
+            </p>
+            {candidateList.map((cand) => (
+              <div
+                key={cand.member_id}
+                onClick={() => selectCandidate(cand)}
+                className="p-2 rounded-lg bg-white border border-[#e3e2e0] hover:border-[#031633] hover:bg-stone-50 cursor-pointer transition-all flex items-center justify-between text-xs"
+              >
+                <div>
+                  <p className="font-bold text-[#031633]">{cand.member_name}</p>
+                  <p className="text-[11px] text-[#75777e] font-mono">
+                    NIM: {cand.member_id} {cand.member_instansi ? `• ${cand.member_instansi}` : ''}
+                  </p>
+                </div>
+                {cand.active_loan_id ? (
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                    Meminjam Loker {cand.active_loker_nomor}
+                  </span>
+                ) : !cand.aktif ? (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Tidak Aktif
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Pilih
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Info Anggota Terpilih */}
         {member && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-950 flex items-start gap-3">
             <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800">
               <UserCheck className="w-5 h-5" />
             </div>
-            <div className="space-y-0.5">
-              <p className="font-bold text-sm text-emerald-900">{member.member_name}</p>
-              <p className="text-emerald-800">ID / NIM: <span className="font-mono font-medium">{member.member_id}</span> ({member.member_type_id})</p>
-              {member.member_phone && <p className="text-emerald-700">No. HP: {member.member_phone}</p>}
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-sm text-emerald-900 truncate">{member.member_name}</p>
+                <button
+                  type="button"
+                  onClick={() => setMember(null)}
+                  className="text-[11px] text-emerald-700 hover:underline cursor-pointer"
+                >
+                  Ganti
+                </button>
+              </div>
+              <p className="text-emerald-800">
+                ID / NIM: <span className="font-mono font-medium">{member.member_id}</span> ({member.member_type_id || 'Mahasiswa'})
+              </p>
+              {member.member_instansi && member.member_instansi !== '-' && (
+                <p className="text-emerald-700">{member.member_instansi} {member.inst_name ? `• ${member.inst_name}` : ''}</p>
+              )}
             </div>
           </div>
         )}
 
-        {/* 3. Info Batas Waktu Otomatis (Jam 16:00 Tutup Perpus) */}
-        <div className="bg-[#ffdcc0]/40 border border-[#ffdcc0] rounded-xl p-3 flex items-start gap-2.5 text-[#2d1600] text-xs">
-          <Clock className="w-4 h-4 text-[#8b500b] shrink-0 mt-0.5" />
+        {/* 3. Info Kebijakan Bebas Batas Waktu */}
+        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-emerald-950">
+          <Clock className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
-            <p className="font-bold text-[#6b3b00]">Batas Pengembalian: Hari Ini Pukul 16:00 WIB</p>
-            <p className="text-[#8b500b] leading-relaxed text-[11px]">
-              Perpustakaan tutup jam 4 sore. Kunci wajib dikembalikan sebelum jam 16:00 WIB. Keterlambatan dikenakan denda bertambah per hari (Rp 5.000 / hari).
+            <p className="font-bold text-emerald-900">Kebijakan: Bebas Batas Waktu Pinjam</p>
+            <p className="text-emerald-800 leading-relaxed text-[11px]">
+              Bebas biaya peminjaman dan bebas denda harian. Denda hanya berlaku jika anak kunci loker dilaporkan hilang.
             </p>
           </div>
         </div>

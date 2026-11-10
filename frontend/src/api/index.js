@@ -22,6 +22,7 @@ export const peminjamanApi = {
   mandiriPinjam: (data) => api.post('/peminjaman/mandiri', data),
   pinjam: (data) => api.post('/peminjaman/pinjam', data),
   kembali: (data) => api.post('/peminjaman/kembali', data),
+  pulihkanKunci: (data) => api.post('/peminjaman/pulihkan-kunci', data),
   getActive: (params) => api.get('/peminjaman/active', { params })
 };
 
@@ -47,6 +48,7 @@ export const kioskApi = {
   getBySlug: (slug) => api.get(`/kiosks/slug/${slug}`),
   create: (data) => api.post('/kiosks', data),
   generateLokers: (id, data) => api.post(`/kiosks/${id}/generate-lokers`, data),
+  reduceLokers: (id, data) => api.post(`/kiosks/${id}/reduce-lokers`, data),
   update: (id, data) => api.put(`/kiosks/${id}`, data),
   delete: (id) => api.delete(`/kiosks/${id}`)
 };

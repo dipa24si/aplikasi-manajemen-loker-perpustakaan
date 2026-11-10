@@ -265,8 +265,21 @@ async function generateLokersForKiosk(req, res, next) {
     }
     const kiosk = kioskRows[0];
 
-    // Tentukan prefix huruf yang belum terpakai
+    // Cek apakah lokasi ini sudah memiliki loker dengan prefix tertentu (lanjutkan penomoran jika ada)
+    const [existingInLoc] = await db.query(
+      "SELECT nomor FROM lokers WHERE lokasi = ? AND nomor LIKE '%-%' ORDER BY id DESC LIMIT 1",
+      [kiosk.lokasi]
+    );
+
     let chosenPrefix = prefix_loker ? prefix_loker.trim().toUpperCase() : null;
+    let startNumber = 1;
+
+    if (existingInLoc.length > 0 && !chosenPrefix) {
+      const parts = existingInLoc[0].nomor.split('-');
+      chosenPrefix = parts[0].trim();
+      startNumber = (parseInt(parts[1], 10) || 0) + 1;
+    }
+
     if (!chosenPrefix) {
       const [usedRows] = await db.query(
         "SELECT DISTINCT UPPER(SUBSTRING_INDEX(nomor, '-', 1)) as prefix FROM lokers WHERE nomor LIKE '%-%'"
@@ -285,8 +298,9 @@ async function generateLokersForKiosk(req, res, next) {
     const totalToMake = Math.min(Math.max(parseInt(jumlah_loker, 10) || 50, 1), 200);
     const lockerValues = [];
 
-    for (let i = 1; i <= totalToMake; i++) {
-      const numPad = totalToMake >= 100 ? String(i).padStart(3, '0') : String(i).padStart(2, '0');
+    const endNumber = startNumber + totalToMake - 1;
+    for (let i = startNumber; i <= endNumber; i++) {
+      const numPad = endNumber >= 100 ? String(i).padStart(3, '0') : String(i).padStart(2, '0');
       const lockerNomor = `${chosenPrefix}-${numPad}`;
       const lockerUkuran = i <= 10 ? 'besar' : 'sedang';
       lockerValues.push([lockerNomor, kiosk.lokasi, lockerUkuran, 'kosong', 'Kondisi baik']);
@@ -299,6 +313,9 @@ async function generateLokersForKiosk(req, res, next) {
       );
     }
 
+    const startPad = endNumber >= 100 ? String(startNumber).padStart(3, '0') : String(startNumber).padStart(2, '0');
+    const endPad = endNumber >= 100 ? String(endNumber).padStart(3, '0') : String(endNumber).padStart(2, '0');
+
     return successResponse(
       res,
       {
@@ -306,11 +323,98 @@ async function generateLokersForKiosk(req, res, next) {
         prefix: chosenPrefix,
         lokasi: kiosk.lokasi
       },
-      `Berhasil membuat ${lockerValues.length} loker (${chosenPrefix}-01 s/d ${chosenPrefix}-${String(lockerValues.length).padStart(2, '0')}) untuk ${kiosk.nama}`,
+      `Berhasil menambahkan ${lockerValues.length} loker (${chosenPrefix}-${startPad} s/d ${chosenPrefix}-${endPad}) untuk ${kiosk.nama}`,
       201
     );
   } catch (err) {
     next(err);
+  }
+}
+
+/**
+ * Kurangi jumlah loker terhubung pada anjungan kiosk (misalnya jika ada typo saat input jumlah awal)
+ */
+async function reduceLokersForKiosk(req, res, next) {
+  const connection = await db.getConnection();
+  try {
+    const { id } = req.params;
+    const { count = 1, loker_ids } = req.body;
+
+    const [kioskRows] = await connection.query('SELECT * FROM kiosks WHERE id = ?', [id]);
+    if (kioskRows.length === 0) {
+      return errorResponse(res, 'Anjungan kiosk tidak ditemukan.', 404);
+    }
+    const kiosk = kioskRows[0];
+
+    let targetLokerIds = [];
+
+    if (Array.isArray(loker_ids) && loker_ids.length > 0) {
+      targetLokerIds = loker_ids;
+    } else {
+      const numToRemove = Math.max(parseInt(count, 10) || 1, 1);
+      // Ambil loker-loker terhubung di lokasi kiosk ini, diurutkan dari id terbesar (paling akhir dibuat)
+      const [lokers] = await connection.query(
+        `SELECT id, nomor, status FROM lokers 
+         WHERE lokasi = ? 
+         ORDER BY id DESC 
+         LIMIT ?`,
+        [kiosk.lokasi, numToRemove]
+      );
+
+      if (lokers.length === 0) {
+        return errorResponse(res, `Tidak ada loker yang ditemukan di lokasi "${kiosk.lokasi}".`, 404);
+      }
+
+      // Pastikan loker yang akan dihapus tidak sedang aktif dipinjam
+      const activeOccupied = lokers.filter(l => l.status === 'terpakai');
+      if (activeOccupied.length > 0) {
+        return errorResponse(
+          res, 
+          `Tidak dapat mengurangi loker karena ${activeOccupied.map(l => l.nomor).join(', ')} sedang aktif dipinjam mahasiswa. Hanya loker kosong yang dapat dihapus.`,
+          400
+        );
+      }
+
+      targetLokerIds = lokers.map(l => l.id);
+    }
+
+    const [targets] = await connection.query(
+      'SELECT id, nomor, status FROM lokers WHERE id IN (?)',
+      [targetLokerIds]
+    );
+
+    const occupied = targets.filter(t => t.status === 'terpakai');
+    if (occupied.length > 0) {
+      return errorResponse(
+        res,
+        `Loker ${occupied.map(l => l.nomor).join(', ')} sedang aktif dipinjam dan tidak dapat dihapus.`,
+        400
+      );
+    }
+
+    await connection.beginTransaction();
+
+    await connection.query('DELETE FROM peminjaman WHERE loker_id IN (?) AND status != "aktif"', [targetLokerIds]);
+    await connection.query('DELETE FROM lokers WHERE id IN (?)', [targetLokerIds]);
+
+    await connection.commit();
+
+    const deletedNomors = targets.map(t => t.nomor).reverse().join(', ');
+
+    return successResponse(
+      res,
+      {
+        kiosk_id: kiosk.id,
+        deleted_count: targets.length,
+        deleted_nomors: targets.map(t => t.nomor)
+      },
+      `Berhasil mengurangi ${targets.length} unit loker (${deletedNomors}) dari lokasi ${kiosk.lokasi}.`
+    );
+  } catch (err) {
+    await connection.rollback();
+    next(err);
+  } finally {
+    connection.release();
   }
 }
 
@@ -320,6 +424,7 @@ module.exports = {
   createKiosk,
   updateKiosk,
   deleteKiosk,
-  generateLokersForKiosk
+  generateLokersForKiosk,
+  reduceLokersForKiosk
 };
 

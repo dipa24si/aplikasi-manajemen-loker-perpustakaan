@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Badge from '../components/common/Badge';
-import { historyApi } from '../api';
+import { historyApi, peminjamanApi } from '../api';
 import { formatDate, formatRupiah } from '../utils/formatters';
 import * as XLSX from 'xlsx';
 import {
@@ -13,7 +13,8 @@ import {
   ChevronRight,
   FileText,
   DollarSign,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function HistoryPage() {
@@ -59,6 +60,25 @@ export default function HistoryPage() {
     fetchHistory(1);
   };
 
+  const handleRecoverLostKey = async (row) => {
+    const confirm = window.confirm(
+      `Konfirmasi penerimaan kunci loker ${row.nomor_loker} dari ${row.member_name || row.member_id}?\n\nStatus loker akan otomatis kembali AVAILABLE dan keterangannya menjadi 'Kondisi aman (kunci telah dikembalikan)'. Denda dibebaskan.`
+    );
+    if (!confirm) return;
+
+    try {
+      await peminjamanApi.pulihkanKunci({
+        peminjaman_id: row.id,
+        nomor_loker: row.nomor_loker,
+        catatan: 'Kondisi aman (kunci telah dikembalikan)'
+      });
+      alert(`Kunci loker ${row.nomor_loker} berhasil diterima kembali! Status loker AVAILABLE dan kunci aman.`);
+      fetchHistory(pagination.page);
+    } catch (err) {
+      alert(err.message || 'Gagal memulihkan status kunci');
+    }
+  };
+
   // Export langsung ke file Excel (.xlsx) dengan SheetJS
   const handleExportExcel = async () => {
     try {
@@ -81,8 +101,8 @@ export default function HistoryPage() {
         'No': index + 1,
         'Nama Mahasiswa': row.member_name || row.member_id,
         'NIM': row.member_id,
-        'Fakultas': row.fakultas || '-',
-        'Program Studi': row.prodi || '-',
+        'Fakultas': row.member_instansi || row.fakultas || '-',
+        'Program Studi': row.inst_name || row.prodi || '-',
         'Nomor Loker': row.nomor_loker,
         'Lokasi Penempatan': row.lokasi_loker || '-',
         'Waktu Pinjam': row.tanggal_pinjam ? formatDate(row.tanggal_pinjam) : '-',
@@ -299,8 +319,8 @@ export default function HistoryPage() {
                       </p>
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2">
-                      <p className="font-semibold text-slate-800">{row.fakultas || '-'}</p>
-                      <p className="text-slate-500 text-[11px]">{row.prodi || '-'}</p>
+                      <p className="font-semibold text-slate-800">{row.member_instansi || row.fakultas || '-'}</p>
+                      <p className="text-slate-500 text-[11px]">{row.inst_name || row.prodi || '-'}</p>
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-700">
                       {formatDate(row.tanggal_pinjam)}
@@ -315,7 +335,25 @@ export default function HistoryPage() {
                       )}
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2">
-                      <Badge status={row.status} size="sm" />
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge status={row.status} size="sm" />
+                        {row.status === 'kunci_hilang' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRecoverLostKey(row)}
+                            className="print:hidden text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                            title="Konfirmasi bahwa kunci fisik telah dikembalikan dan kondisi kunci sekarang aman"
+                          >
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            <span>Kunci Dikembalikan</span>
+                          </button>
+                        )}
+                        {row.status === 'selesai' && row.catatan && (row.catatan.toLowerCase().includes('hilang') || row.catatan.toLowerCase().includes('pulih')) && (
+                          <span className="text-[9.5px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            ✓ Kunci Pulih (Aman)
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 px-3 print:py-1.5 print:px-2 font-medium">
                       {parseFloat(row.denda) > 0 ? (

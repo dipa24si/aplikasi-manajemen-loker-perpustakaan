@@ -10,6 +10,7 @@ router.get('/slug/:slug', kioskController.getKioskBySlug);
 // Admin untuk kelola kiosk
 router.post('/', verifyToken, requireAdmin, kioskController.createKiosk);
 router.post('/:id/generate-lokers', verifyToken, requireAdmin, kioskController.generateLokersForKiosk);
+router.post('/:id/reduce-lokers', verifyToken, requireAdmin, kioskController.reduceLokersForKiosk);
 router.put('/:id', verifyToken, requireAdmin, kioskController.updateKiosk);
 router.delete('/:id', verifyToken, requireAdmin, kioskController.deleteKiosk);
 

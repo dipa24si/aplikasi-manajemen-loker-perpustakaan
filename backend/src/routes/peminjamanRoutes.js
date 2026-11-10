@@ -9,6 +9,7 @@ router.post('/mandiri', peminjamanController.mandiriPinjam);
 // Endpoint operasional petugas (Perlu Login)
 router.post('/pinjam', verifyToken, peminjamanController.pinjam);
 router.post('/kembali', verifyToken, peminjamanController.kembali);
+router.post('/pulihkan-kunci', verifyToken, peminjamanController.pulihkanKunciHilang);
 router.get('/active', verifyToken, peminjamanController.getActiveLoan);
 
 module.exports = router;

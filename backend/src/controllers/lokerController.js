@@ -21,20 +21,26 @@ async function getAllLokers(req, res, next) {
         l.catatan,
         l.created_at,
         l.updated_at,
-        p.id AS peminjaman_aktif_id,
-        p.member_id,
-        p.tanggal_pinjam,
-        p.batas_kembali,
-        p.catatan AS catatan_pinjam,
-        COALESCE(a.member_name, p.member_id) AS member_name,
-        COALESCE(a.member_instansi, '-') AS member_instansi,
-        COALESCE(a.inst_name, '-') AS inst_name,
-        a.member_type_id,
-        pt.nama AS nama_petugas
+        COALESCE(p.id, plost.id) AS peminjaman_aktif_id,
+        COALESCE(p.member_id, plost.member_id) AS member_id,
+        COALESCE(p.tanggal_pinjam, plost.tanggal_pinjam) AS tanggal_pinjam,
+        COALESCE(p.batas_kembali, plost.batas_kembali) AS batas_kembali,
+        COALESCE(p.catatan, plost.catatan) AS catatan_pinjam,
+        COALESCE(a.member_name, alost.member_name, p.member_id, plost.member_id) AS member_name,
+        COALESCE(a.member_instansi, alost.member_instansi, '-') AS member_instansi,
+        COALESCE(a.inst_name, alost.inst_name, '-') AS inst_name,
+        COALESCE(a.member_type_id, alost.member_type_id) AS member_type_id,
+        COALESCE(pt.nama, ptlost.nama) AS nama_petugas,
+        CASE WHEN p.id IS NOT NULL THEN 'aktif' WHEN plost.id IS NOT NULL THEN 'kunci_hilang' ELSE NULL END AS loan_status
       FROM lokers l
       LEFT JOIN peminjaman p ON p.loker_id = l.id AND p.status = 'aktif'
       LEFT JOIN v_anggota a ON a.member_id = p.member_id
       LEFT JOIN petugas pt ON pt.id = p.petugas_pinjam_id
+      LEFT JOIN peminjaman plost ON plost.loker_id = l.id AND plost.status = 'kunci_hilang' AND plost.id = (
+        SELECT MAX(id) FROM peminjaman WHERE loker_id = l.id AND status = 'kunci_hilang'
+      )
+      LEFT JOIN v_anggota alost ON alost.member_id = plost.member_id
+      LEFT JOIN petugas ptlost ON ptlost.id = plost.petugas_pinjam_id
       WHERE 1=1
     `;
     const params = [];
@@ -76,17 +82,22 @@ async function getLokerById(req, res, next) {
     const [rows] = await db.query(`
       SELECT 
         l.*,
-        p.id AS peminjaman_aktif_id,
-        p.member_id,
-        p.tanggal_pinjam,
-        p.batas_kembali,
-        COALESCE(a.member_name, p.member_id) AS member_name,
-        COALESCE(a.member_instansi, '-') AS member_instansi,
-        COALESCE(a.inst_name, '-') AS inst_name,
-        a.member_type_id,
+        COALESCE(p.id, plost.id) AS peminjaman_aktif_id,
+        COALESCE(p.member_id, plost.member_id) AS member_id,
+        COALESCE(p.tanggal_pinjam, plost.tanggal_pinjam) AS tanggal_pinjam,
+        COALESCE(p.batas_kembali, plost.batas_kembali) AS batas_kembali,
+        COALESCE(a.member_name, alost.member_name, p.member_id, plost.member_id) AS member_name,
+        COALESCE(a.member_instansi, alost.member_instansi, '-') AS member_instansi,
+        COALESCE(a.inst_name, alost.inst_name, '-') AS inst_name,
+        COALESCE(a.member_type_id, alost.member_type_id) AS member_type_id,
+        CASE WHEN p.id IS NOT NULL THEN 'aktif' WHEN plost.id IS NOT NULL THEN 'kunci_hilang' ELSE NULL END AS loan_status
       FROM lokers l
       LEFT JOIN peminjaman p ON p.loker_id = l.id AND p.status = 'aktif'
       LEFT JOIN v_anggota a ON a.member_id = p.member_id
+      LEFT JOIN peminjaman plost ON plost.loker_id = l.id AND plost.status = 'kunci_hilang' AND plost.id = (
+        SELECT MAX(id) FROM peminjaman WHERE loker_id = l.id AND status = 'kunci_hilang'
+      )
+      LEFT JOIN v_anggota alost ON alost.member_id = plost.member_id
       WHERE l.id = ?
       LIMIT 1
     `, [id]);
@@ -168,10 +179,31 @@ async function updateStatus(req, res, next) {
       return errorResponse(res, 'Loker sedang dipinjam! Selesaikan peminjaman terlebih dahulu sebelum mengubah status.', 400);
     }
 
+    const [currentLoker] = await db.query('SELECT status, catatan FROM lokers WHERE id = ?', [id]);
+    let finalCatatan = catatan !== undefined ? catatan : null;
+    if (status === 'kosong' && (!finalCatatan || finalCatatan.trim() === '')) {
+      if (currentLoker.length > 0 && currentLoker[0].catatan && currentLoker[0].catatan.toLowerCase().includes('kunci')) {
+        finalCatatan = 'Kondisi aman (kunci telah dikembalikan)';
+      }
+    }
+
     await db.query(
       'UPDATE lokers SET status = ?, catatan = COALESCE(?, catatan) WHERE id = ?',
-      [status, catatan !== undefined ? catatan : null, id]
+      [status, finalCatatan, id]
     );
+
+    // Jika diubah menjadi kosong, pulihkan juga peminjaman kunci_hilang (jika ada)
+    if (status === 'kosong') {
+      await db.query(
+        `UPDATE peminjaman 
+         SET status = 'selesai', 
+             tanggal_kembali = NOW(), 
+             denda = 0, 
+             catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci telah dipulihkan oleh petugas. Kondisi kunci aman.')
+         WHERE loker_id = ? AND status = 'kunci_hilang'`,
+        [id]
+      );
+    }
 
     return successResponse(res, null, `Status loker diubah menjadi ${status}`);
   } catch (err) {

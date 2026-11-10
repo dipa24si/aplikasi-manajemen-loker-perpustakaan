@@ -200,11 +200,12 @@ export default function TransaksiPage() {
               <CheckCircle className="w-7 h-7" />
             </div>
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                PENGEMBALIAN BERHASIL
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                {successInfo.is_recovered && <span className="px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-800 text-[10px] font-black">KUNCI PULIH</span>}
+                <span>{successInfo.is_recovered ? 'KUNCI HILANG BERHASIL DITERIMA KEMBALI' : 'PENGEMBALIAN BERHASIL'}</span>
               </span>
               <h3 className="text-xl font-black text-emerald-900">
-                Kunci Loker {successInfo.nomor_loker} Diterima
+                Kunci Loker {successInfo.nomor_loker} {successInfo.is_recovered ? 'Telah Diterima & Aman' : 'Diterima'}
               </h3>
             </div>
           </div>
@@ -212,23 +213,25 @@ export default function TransaksiPage() {
           <div className="bg-white/80 rounded-2xl p-4 border border-emerald-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
             <div>
               <span className="text-slate-400">Peminjam:</span>
-              <p className="font-bold text-slate-800 text-sm">{successInfo.member_name}</p>
+              <p className="font-bold text-slate-800 text-sm">{successInfo.member_name || '-'}</p>
             </div>
             <div>
               <span className="text-slate-400">Status Loker Sekarang:</span>
               <p className="font-bold text-emerald-700 text-sm flex items-center gap-1.5 mt-0.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                AVAILABLE (Siap Dipinjam)
+                AVAILABLE (Kunci Aman & Siap)
               </p>
             </div>
             <div>
-              <span className="text-slate-400">Denda Kunci Hilang:</span>
+              <span className="text-slate-400">{successInfo.is_recovered ? 'Status Denda Kunci:' : 'Denda Kunci Hilang:'}</span>
               {successInfo.denda > 0 ? (
                 <p className="font-bold text-rose-600 text-sm">
                   {formatRupiah(successInfo.denda)} (Ganti Rugi Kunci Hilang)
                 </p>
               ) : (
-                <p className="font-semibold text-emerald-700 text-sm">Bebas Denda</p>
+                <p className="font-semibold text-emerald-700 text-sm">
+                  {successInfo.is_recovered ? 'Kunci Kembali (Bebas Denda)' : 'Bebas Denda'}
+                </p>
               )}
             </div>
           </div>

@@ -373,7 +373,13 @@ export default function LokerManagePage() {
                         {loker.status !== 'terpakai' && (
                           <button
                             onClick={() => handleToggleStatus(loker)}
-                            title={loker.status === 'rusak' ? 'Tandai Siap' : 'Tandai Rusak'}
+                            title={
+                              loker.status === 'rusak'
+                                ? (loker.catatan && loker.catatan.toLowerCase().includes('kunci'))
+                                  ? 'Kunci Sudah Dikembalikan (Kunci Aman & Loker Siap)'
+                                  : 'Tandai Siap (Selesai Perbaikan)'
+                                : 'Tandai Perbaikan / Rusak'
+                            }
                             className={`p-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
                               loker.status === 'rusak'
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
