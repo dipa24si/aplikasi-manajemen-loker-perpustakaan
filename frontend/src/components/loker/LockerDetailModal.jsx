@@ -229,8 +229,8 @@ export default function LockerDetailModal({
             </button>
           )}
 
-          {/* Status Switch (Kosong vs Maintenance/Rusak) */}
-          {loker.status !== 'terpakai' && (
+          {/* Status Switch (Kosong vs Maintenance/Rusak) - Disembunyikan jika kasus kunci hilang */}
+          {loker.status !== 'terpakai' && !isLostKey && (
             <div className="flex gap-2">
               {loker.status === 'kosong' ? (
                 <button

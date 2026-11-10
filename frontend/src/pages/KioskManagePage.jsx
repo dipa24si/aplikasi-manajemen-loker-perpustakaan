@@ -53,6 +53,16 @@ export default function KioskManagePage({ setActiveTab }) {
   const [addMoreCount, setAddMoreCount] = useState(10);
   const [addMoreLoading, setAddMoreLoading] = useState(false);
 
+  // Floating Alert Toast State
+  const [alertInfo, setAlertInfo] = useState(null);
+
+  const showAlert = (type, title, message) => {
+    setAlertInfo({ type, title, message });
+    setTimeout(() => {
+      setAlertInfo((prev) => (prev?.title === title ? null : prev));
+    }, 4500);
+  };
+
   // Form State
   const [formData, setFormData] = useState({
     nama: '',
@@ -218,7 +228,7 @@ export default function KioskManagePage({ setActiveTab }) {
     }
 
     if (!formData.nama.trim() || !formData.slug.trim() || !finalLokasi.trim()) {
-      alert('Nama anjungan, URL slug, dan lokasi wajib diisi.');
+      showAlert('error', 'Form Belum Lengkap', 'Nama anjungan, URL slug, dan lokasi wajib diisi.');
       return;
     }
 
@@ -232,18 +242,24 @@ export default function KioskManagePage({ setActiveTab }) {
       };
       if (editingKiosk) {
         await kioskApi.update(editingKiosk.id, payload);
+        showAlert('success', 'Anjungan Diperbarui!', `Perubahan anjungan "${formData.nama}" berhasil disimpan.`);
       } else {
         const res = await kioskApi.create(payload);
-        if (res.data && res.data.generated_lokers > 0) {
-          alert(`Berhasil! Anjungan dibuat dan otomatis terhubung dengan ${res.data.generated_lokers} loker (${res.data.prefix_loker}-01 s/d ${res.data.prefix_loker}-${String(res.data.generated_lokers).padStart(2, '0')}). Kuncinya kini siap dicetak di menu Sirkulasi Kunci.`);
-        }
+        const generatedCount = res.data?.generated_lokers;
+        showAlert(
+          'success',
+          'Anjungan Berhasil Dibuat!',
+          generatedCount > 0
+            ? `Anjungan "${formData.nama}" dibuat dan terhubung otomatis dengan ${generatedCount} unit loker.`
+            : `Anjungan "${formData.nama}" berhasil dibuat.`
+        );
       }
       setIsModalOpen(false);
       fetchKiosks();
       fetchLocations();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Gagal menyimpan anjungan kiosk');
+      showAlert('error', 'Gagal Menyimpan Anjungan', err.message || 'Gagal menyimpan anjungan kiosk');
     } finally {
       setModalLoading(false);
     }
@@ -265,26 +281,27 @@ export default function KioskManagePage({ setActiveTab }) {
 
     const countNum = parseInt(reduceCount, 10);
     if (!countNum || countNum < 1) {
-      alert('Masukkan jumlah loker yang valid minimal 1 unit.');
+      showAlert('error', 'Jumlah Tidak Valid', 'Masukkan jumlah loker yang valid minimal 1 unit.');
       return;
     }
 
     if (countNum > (reducingKiosk.available_lokers || 0)) {
-      alert(`Jumlah pengurangan (${countNum}) melebihi jumlah loker kosong (${reducingKiosk.available_lokers || 0}). Loker yang sedang dipinjam mahasiswa tidak dapat dihapus.`);
+      showAlert('error', 'Kapasitas Kurang', `Jumlah pengurangan (${countNum}) melebihi loker kosong (${reducingKiosk.available_lokers || 0}). Loker yang sedang dipinjam mahasiswa tidak dapat dihapus.`);
       return;
     }
 
+    const kioskNama = reducingKiosk.nama;
     try {
       setReduceLoading(true);
       const res = await kioskApi.reduceLokers(reducingKiosk.id, { count: countNum });
-      alert(res.message || `Berhasil mengurangi ${countNum} unit loker dari ${reducingKiosk.nama}.`);
       setIsReduceModalOpen(false);
       setReducingKiosk(null);
       await fetchKiosks();
       await fetchLocations();
+      showAlert('success', 'Berhasil Dikurangi!', res.message || `Berhasil mengurangi ${countNum} unit loker dari anjungan ${kioskNama}.`);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Gagal mengurangi jumlah loker');
+      showAlert('error', 'Gagal Mengurangi Loker', err.message || 'Gagal mengurangi jumlah loker');
     } finally {
       setReduceLoading(false);
     }
@@ -302,21 +319,22 @@ export default function KioskManagePage({ setActiveTab }) {
 
     const countNum = parseInt(addMoreCount, 10);
     if (!countNum || countNum < 1) {
-      alert('Masukkan jumlah loker yang valid minimal 1 unit.');
+      showAlert('error', 'Jumlah Tidak Valid', 'Masukkan jumlah loker yang valid minimal 1 unit.');
       return;
     }
 
+    const kioskNama = addMoreKiosk.nama;
     try {
       setAddMoreLoading(true);
       const res = await kioskApi.generateLokers(addMoreKiosk.id, { jumlah_loker: countNum });
-      alert(res.message || `Berhasil menambahkan ${countNum} unit loker untuk ${addMoreKiosk.nama}.`);
       setIsAddMoreModalOpen(false);
       setAddMoreKiosk(null);
       await fetchKiosks();
       await fetchLocations();
+      showAlert('success', 'Berhasil Ditambah!', res.message || `Berhasil menambahkan ${countNum} unit loker untuk anjungan ${kioskNama}.`);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Gagal membuat loker');
+      showAlert('error', 'Gagal Menambah Loker', err.message || 'Gagal membuat loker');
     } finally {
       setAddMoreLoading(false);
     }
@@ -330,9 +348,10 @@ export default function KioskManagePage({ setActiveTab }) {
     try {
       await kioskApi.delete(kiosk.id);
       fetchKiosks();
+      showAlert('success', 'Anjungan Dihapus!', `Anjungan "${kiosk.nama}" berhasil dihapus.`);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Gagal menghapus anjungan');
+      showAlert('error', 'Gagal Menghapus Anjungan', err.message || 'Gagal menghapus anjungan');
     }
   };
 
@@ -345,6 +364,62 @@ export default function KioskManagePage({ setActiveTab }) {
 
   return (
     <div className="space-y-6">
+      {/* FLOATING ALERT NOTIFICATION BANNER */}
+      {alertInfo && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-full animate-in slide-in-from-top-4 fade-in duration-200">
+          <div
+            className={`p-4 rounded-2xl shadow-2xl border flex items-start gap-3.5 backdrop-blur-md transition-all ${
+              alertInfo.type === 'success'
+                ? 'bg-[#031633] text-white border-emerald-500/40 shadow-[#031633]/30'
+                : 'bg-rose-950 text-white border-rose-500/40 shadow-rose-950/40'
+            }`}
+          >
+            <div
+              className={`p-2 rounded-xl shrink-0 ${
+                alertInfo.type === 'success'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              }`}
+            >
+              {alertInfo.type === 'success' ? (
+                <Check className="w-5 h-5" />
+              ) : (
+                <AlertCircle className="w-5 h-5" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 pr-1">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm tracking-tight text-white">
+                  {alertInfo.title}
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    alertInfo.type === 'success'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  }`}
+                >
+                  {alertInfo.type === 'success' ? 'Sukses' : 'Peringatan'}
+                </span>
+              </div>
+              <p className="text-xs text-stone-200 mt-1 leading-relaxed">
+                {alertInfo.message}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAlertInfo(null)}
+              className="text-stone-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer text-xs"
+              title="Tutup Notifikasi"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Halaman */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
