@@ -418,9 +418,62 @@ async function reduceLokersForKiosk(req, res, next) {
   }
 }
 
+/**
+ * Ambil daftar ketersediaan loker di lokasi kiosk (publik untuk layar anjungan mandiri)
+ */
+async function getKioskLokers(req, res, next) {
+  try {
+    const { slug } = req.params;
+    const cleanSlug = (slug || '').toLowerCase().trim();
+
+    let kioskRows = [];
+    if (!cleanSlug || cleanSlug === 'kiosk' || cleanSlug === 'default') {
+      [kioskRows] = await db.query(
+        'SELECT id, nama, lokasi, slug FROM kiosks WHERE aktif = 1 ORDER BY id ASC LIMIT 1'
+      );
+    } else {
+      [kioskRows] = await db.query(
+        'SELECT id, nama, lokasi, slug FROM kiosks WHERE slug = ? AND aktif = 1 LIMIT 1',
+        [cleanSlug]
+      );
+    }
+
+    if (kioskRows.length === 0) {
+      return errorResponse(res, 'Anjungan kiosk tidak ditemukan', 404);
+    }
+
+    const kiosk = kioskRows[0];
+
+    const [lokers] = await db.query(
+      `SELECT id, nomor, lokasi, ukuran, status 
+       FROM lokers 
+       WHERE (lokasi = ? OR lokasi LIKE CONCAT('%', ?, '%'))
+       ORDER BY nomor ASC`,
+      [kiosk.lokasi, kiosk.lokasi]
+    );
+
+    const total = lokers.length;
+    const available = lokers.filter(l => l.status === 'kosong').length;
+
+    return successResponse(
+      res,
+      {
+        kiosk,
+        total,
+        available,
+        lokers
+      },
+      'Data ketersediaan loker kiosk berhasil diambil'
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAllKiosks,
   getKioskBySlug,
+  getKioskLokers,
   createKiosk,
   updateKiosk,
   deleteKiosk,

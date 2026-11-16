@@ -46,6 +46,7 @@ export const petugasApi = {
 export const kioskApi = {
   getAll: () => api.get('/kiosks'),
   getBySlug: (slug) => api.get(`/kiosks/slug/${slug}`),
+  getLokersBySlug: (slug) => api.get(`/kiosks/slug/${slug}/lokers`),
   create: (data) => api.post('/kiosks', data),
   generateLokers: (id, data) => api.post(`/kiosks/${id}/generate-lokers`, data),
   reduceLokers: (id, data) => api.post(`/kiosks/${id}/reduce-lokers`, data),

@@ -57,11 +57,12 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
       setKioskNotFound(false);
 
       try {
+        let activeKiosk = null;
         if (!currentSlug || currentSlug === 'kiosk') {
           // Jika tanpa slug spesifik, ambil anjungan pertama yang aktif di database
           const resAll = await kioskApi.getAll();
           if (resAll.data && resAll.data.length > 0) {
-            if (isMounted) setKioskData(resAll.data[0]);
+            activeKiosk = resAll.data[0];
           } else {
             if (isMounted) setKioskNotFound(true);
           }
@@ -69,9 +70,22 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
           // Ambil langsung anjungan dari database berdasarkan slug URL
           const res = await kioskApi.getBySlug(currentSlug);
           if (res.data) {
-            if (isMounted) setKioskData(res.data);
+            activeKiosk = res.data;
           } else {
             if (isMounted) setKioskNotFound(true);
+          }
+        }
+
+        if (activeKiosk && isMounted) {
+          setKioskData(activeKiosk);
+          // Ambil daftar ketersediaan loker publik untuk anjungan ini
+          try {
+            const resLokers = await kioskApi.getLokersBySlug(activeKiosk.slug);
+            if (resLokers.data && resLokers.data.lokers && isMounted) {
+              setAllLokers(resLokers.data.lokers);
+            }
+          } catch (e) {
+            console.warn('Gagal memuat detail loker publik:', e?.message);
           }
         }
       } catch (err) {
@@ -103,14 +117,41 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
     return 'Anjungan Peminjaman Loker';
   }, [kioskData]);
 
-  const fetchLokers = async () => {
+  const fetchLokers = async (slugToUse) => {
+    const slug = slugToUse || currentSlug || kioskData?.slug;
     try {
-      const res = await lokerApi.getAll();
-      if (res.data) {
-        setAllLokers(res.data);
+      if (slug && slug !== 'kiosk') {
+        const res = await kioskApi.getLokersBySlug(slug);
+        if (res.data && res.data.lokers) {
+          setAllLokers(res.data.lokers);
+          if (res.data.kiosk) {
+            setKioskData(prev => ({
+              ...prev,
+              ...res.data.kiosk,
+              total_lokers: res.data.total,
+              available_lokers: res.data.available
+            }));
+          }
+          return;
+        }
+      }
+
+      // Fallback publik default
+      const resDef = await kioskApi.getLokersBySlug('default');
+      if (resDef.data && resDef.data.lokers) {
+        setAllLokers(resDef.data.lokers);
+        if (resDef.data.kiosk && !kioskData) {
+          setKioskData(resDef.data.kiosk);
+        }
       }
     } catch (err) {
-      console.error('Error fetching lokers for kiosk:', err);
+      // Fallback cadangan jika sedang login
+      try {
+        const res = await lokerApi.getAll();
+        if (res.data) setAllLokers(res.data);
+      } catch (e) {
+        // Abaikan
+      }
     }
   };
 
@@ -119,7 +160,15 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
     if (inputRef.current) {
       inputRef.current.focus();
     }
-  }, []);
+  }, [currentSlug]);
+
+  // Auto-refresh ketersediaan loker berkala (setiap 15 detik) agar selalu akurat secara real-time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchLokers();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [currentSlug, kioskData?.slug]);
 
   // Auto-clear pesan error otomatis setelah 7 detik agar layar kembali bersih
   useEffect(() => {
@@ -137,22 +186,31 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
     }
   }, [nimInput]);
 
-  // Hitung jumlah loker Available khusus di lokasi anjungan ini
+  // Hitung jumlah loker Available khusus di lokasi anjungan ini (tetap akurat meski belum login)
   const areaLockerStats = useMemo(() => {
-    if (!targetLocation) {
-      return { total: 0, available: 0 };
+    if (allLokers.length > 0 && targetLocation) {
+      const cleanTarget = targetLocation.toLowerCase();
+      const lokersInArea = allLokers.filter((l) => {
+        const loc = (l.lokasi || '').toLowerCase();
+        return loc === cleanTarget || loc.includes(cleanTarget) || cleanTarget.includes(loc);
+      });
+
+      const total = lokersInArea.length;
+      const available = lokersInArea.filter((l) => l.status === 'kosong').length;
+
+      return { total, available };
     }
-    const cleanTarget = targetLocation.toLowerCase();
-    const lokersInArea = allLokers.filter((l) => {
-      const loc = (l.lokasi || '').toLowerCase();
-      return loc === cleanTarget || loc.includes(cleanTarget) || cleanTarget.includes(loc);
-    });
 
-    const total = lokersInArea.length;
-    const available = lokersInArea.filter((l) => l.status === 'kosong').length;
+    // Fallback langsung ke data kiosk dari database jika allLokers belum terisi
+    if (kioskData) {
+      return {
+        total: parseInt(kioskData.total_lokers, 10) || 0,
+        available: parseInt(kioskData.available_lokers, 10) || 0
+      };
+    }
 
-    return { total, available };
-  }, [allLokers, targetLocation]);
+    return { total: 0, available: 0 };
+  }, [allLokers, targetLocation, kioskData]);
 
   // Pemutar suara keberhasilan dari file lokal (/sounds/success.wav)
   const playSuccessSound = () => {
@@ -429,7 +487,7 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Lokasi Badge di Header (Sesuai Foto 3) */}
+            {/* Lokasi Badge di Header */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-400/20 border border-sky-300/40 text-sky-100 text-xs sm:text-sm font-semibold shadow-xs">
               <span className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></span>
               <MapPin className="w-3.5 h-3.5 text-cyan-300" />
@@ -477,15 +535,20 @@ export default function KioskPage({ standalone = true, tempatSlug = '' }) {
 
         {/* Status Kapasitas Loker di Area Ini */}
         <div className="flex items-center justify-center gap-3">
-          {areaLockerStats.available > 0 ? (
+          {kioskLoading ? (
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 border-2 border-slate-200 text-sm font-bold shadow-xs">
+              <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+              <span>Memeriksa Ketersediaan Loker...</span>
+            </span>
+          ) : areaLockerStats.available > 0 ? (
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border-2 border-emerald-200 text-sm font-bold shadow-xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>{areaLockerStats.available} Loker Siap Digunakan di Area Ini</span>
+              <span>{areaLockerStats.available} Loker Siap Digunakan di Area Ini (Tersedia {areaLockerStats.available} dari {areaLockerStats.total} Unit)</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 text-rose-800 border-2 border-rose-200 text-sm font-bold shadow-xs">
               <AlertCircle className="w-4 h-4 text-rose-600" />
-              <span>Loker di Area Ini Sedang Penuh</span>
+              <span>Loker di Area Ini Sedang Penuh ({areaLockerStats.total} Unit Terisi)</span>
             </span>
           )}
         </div>

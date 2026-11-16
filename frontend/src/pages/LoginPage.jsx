@@ -6,7 +6,6 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  ShieldCheck,
   AlertCircle
 } from 'lucide-react';
 
@@ -41,12 +40,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const setDemoAccount = (u, p) => {
-    setUsername(u);
-    setPassword(p);
-    setError('');
   };
 
   return (
@@ -138,32 +131,6 @@ export default function LoginPage() {
             <ArrowRight className="w-4 h-4 text-[#ffdcc0]" />
           </button>
         </form>
-
-        {/* Quick Demo Credentials */}
-        <div className="mt-6 pt-5 border-t border-[#e9e8e5]">
-          <p className="text-[10px] font-bold text-[#75777e] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#8b500b]" />
-            <span>Akun Cepat (Uji Coba Demo):</span>
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setDemoAccount('admin', 'admin123')}
-              className="py-2 px-3 text-xs font-semibold text-[#031633] bg-[#f4f3f0] hover:bg-[#ffdcc0]/60 hover:border-[#8b500b]/40 border border-[#e3e2e0] rounded-xl transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <span>👑</span>
-              <span>Login Admin</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoAccount('petugas', 'petugas123')}
-              className="py-2 px-3 text-xs font-semibold text-[#031633] bg-[#f4f3f0] hover:bg-[#ffdcc0]/60 hover:border-[#8b500b]/40 border border-[#e3e2e0] rounded-xl transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <span>💼</span>
-              <span>Login Petugas</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Bottom Footer Note */}

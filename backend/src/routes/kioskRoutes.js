@@ -3,9 +3,10 @@ const router = express.Router();
 const kioskController = require('../controllers/kioskController');
 const { verifyToken, requireAdmin } = require('../middlewares/auth');
 
-// Publik boleh membaca daftar kiosk dan detail kiosk berdasarkan slug (untuk layar anjungan)
+// Publik boleh membaca daftar kiosk, detail kiosk, dan ketersediaan loker anjungan
 router.get('/', kioskController.getAllKiosks);
 router.get('/slug/:slug', kioskController.getKioskBySlug);
+router.get('/slug/:slug/lokers', kioskController.getKioskLokers);
 
 // Admin untuk kelola kiosk
 router.post('/', verifyToken, requireAdmin, kioskController.createKiosk);
