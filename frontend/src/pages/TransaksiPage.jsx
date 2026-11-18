@@ -156,7 +156,7 @@ export default function TransaksiPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 font-hanken">
+    <div className="space-y-6 font-hanken">
       {/* Header Sirkulasi Petugas */}
       <div className="bg-gradient-to-r from-[#031633] via-[#1a2b49] to-[#031633] text-white rounded-3xl p-5 sm:p-7 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -275,7 +275,7 @@ export default function TransaksiPage() {
             🎉 Semua kunci telah dikembalikan! Semua loker saat ini berstatus <b>Available</b>.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {allLokers
               .filter((l) => l.peminjaman_aktif_id || (l.status === 'terpakai' && l.member_id))
               .map((loker) => {
