@@ -149,6 +149,28 @@ export default function HistoryPage() {
     window.print();
   };
 
+  const formatPetugas = (name) => {
+    if (!name || name === '-') return '-';
+    if (name.toLowerCase().includes('administrator')) return 'Admin Perpus';
+    return name;
+  };
+
+  const renderDateTime = (dateStr) => {
+    if (!dateStr) return '-';
+    const formatted = formatDate(dateStr);
+    if (!formatted || formatted === '-') return '-';
+    const parts = formatted.split(', ');
+    if (parts.length === 2) {
+      return (
+        <span className="leading-tight block">
+          <span className="font-semibold text-black block">{parts[0]}</span>
+          <span className="text-[7pt] text-slate-500 font-mono block">{parts[1]} WIB</span>
+        </span>
+      );
+    }
+    return <span className="text-black">{formatted}</span>;
+  };
+
   const totalDendaPage = items.reduce((sum, item) => sum + (parseFloat(item.denda) || 0), 0);
 
   return (
@@ -156,26 +178,33 @@ export default function HistoryPage() {
       {/* ========================================================
           KOP SURAT RESMI CETAK (HANYA MUNCUL DI PRINT DOKUMEN)
           ======================================================== */}
-      <div className="hidden print:flex items-center gap-4 border-b-2 border-slate-900 pb-3 mb-4">
+      <div className="hidden print:flex items-center justify-between border-b-[2.5px] border-double border-black pb-2 mb-2 font-serif">
         <img src="/logo.png" alt="Logo UNRI" className="w-16 h-16 object-contain shrink-0" />
-        <div className="text-left font-serif">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+        <div className="flex-1 text-center px-2">
+          <h4 className="text-[9.5pt] font-semibold uppercase tracking-wider text-black leading-tight">
             KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI
-          </h3>
-          <h2 className="text-base font-black uppercase tracking-wider text-slate-900">
-            UNIVERSITAS RIAU — UPA PERPUSTAKAAN
+          </h4>
+          <h2 className="text-[13pt] font-black uppercase tracking-wider text-black leading-tight mt-0.5">
+            UNIVERSITAS RIAU
           </h2>
-          <p className="text-[10px] text-slate-600">
+          <h3 className="text-[10.5pt] font-bold uppercase tracking-wide text-black leading-tight mt-0.5">
+            UNIT PENUNJANG AKADEMIK (UPA) PERPUSTAKAAN
+          </h3>
+          <p className="text-[7.5pt] text-slate-700 font-sans leading-tight mt-1">
             Kampus Bina Widya Km. 12,5 Simpang Baru, Pekanbaru 28293 | Laman: perpus.unri.ac.id
           </p>
+          <p className="text-[7.5pt] text-slate-700 font-sans leading-tight">
+            Surel: perpustakaan@unri.ac.id | Pos-el: pustaka@unri.ac.id
+          </p>
         </div>
+        <div className="w-16 shrink-0"></div>
       </div>
 
-      <div className="hidden print:block text-center border-b border-slate-300 pb-2 mb-3">
-        <h3 className="text-base font-bold uppercase tracking-wider text-slate-900 font-sans">
-          LAPORAN RIWAYAT PEMINJAMAN LOKER PERPUSTAKAAN
+      <div className="hidden print:block text-center pb-2 mb-2 font-sans">
+        <h3 className="text-[11pt] font-extrabold uppercase tracking-wide text-black">
+          LAPORAN RIWAYAT TRANSAKSI PEMINJAMAN LOKER
         </h3>
-        <p className="text-xs text-slate-500 font-sans">
+        <p className="text-[8pt] text-slate-600 mt-0.5">
           Dicetak pada: {formatDate(new Date())} | Total Data: {pagination.total} Transaksi | Total Denda: {formatRupiah(totalDendaPage)}
         </p>
       </div>
@@ -261,31 +290,31 @@ export default function HistoryPage() {
       </div>
 
       {/* Summary Banner */}
-      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 px-4 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2 print:border-slate-400">
+      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 px-4 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2 print:hidden">
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-indigo-600 print:text-black" />
+          <FileText className="w-4 h-4 text-indigo-600" />
           <span>Total Transaksi: <b className="text-slate-800">{pagination.total}</b> baris</span>
         </div>
         <div className="flex items-center gap-2 font-medium">
-          <DollarSign className="w-4 h-4 text-emerald-600 print:text-black" />
-          <span>Total Denda di Halaman Ini: <b className="text-emerald-700 print:text-black font-bold">{formatRupiah(totalDendaPage)}</b></span>
+          <DollarSign className="w-4 h-4 text-emerald-600" />
+          <span>Total Denda di Halaman Ini: <b className="text-emerald-700 font-bold">{formatRupiah(totalDendaPage)}</b></span>
         </div>
       </div>
 
       {/* History Table */}
-      <div className="bg-white rounded-2xl border border-[#e3e2e0] shadow-2xs overflow-hidden print:border-none print:shadow-none font-hanken">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse print:text-[10pt]">
-            <thead>
-              <tr className="bg-[#f4f3f0] text-[#031633] border-b border-[#e3e2e0] uppercase font-bold text-[10px] tracking-wider print:bg-slate-100 print:border-black">
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Loker</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Nama & NIM</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Fakultas / Prodi</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Waktu Pinjam</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Waktu Kembali</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Status</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Denda (Kunci Hilang)</th>
-                <th className="py-3 px-3 print:py-1.5 print:px-2">Petugas</th>
+      <div className="bg-white rounded-2xl border border-[#e3e2e0] shadow-2xs overflow-hidden print:border-none print:shadow-none print:rounded-none font-hanken">
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full text-left text-xs border-collapse print:text-[7.5pt]">
+            <thead className="print:table-header-group">
+              <tr className="bg-[#f4f3f0] text-[#031633] border-b border-[#e3e2e0] uppercase font-bold text-[10px] tracking-wider print:bg-slate-100 print:border-black print:text-[7.5pt]">
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[10%] print:w-[10%]">Loker</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[18%] print:w-[18%]">Nama & NIM</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[16%] print:w-[16%]">Fakultas / Prodi</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[13%] print:w-[13%]">Waktu Pinjam</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[13%] print:w-[13%]">Waktu Kembali</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[10%] print:w-[10%]">Status</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[9%] print:w-[9%] print:text-right">Denda</th>
+                <th className="py-3 px-3 print:py-1.5 print:px-1.5 w-[11%] print:w-[11%]">Petugas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 print:divide-slate-300">
@@ -304,44 +333,59 @@ export default function HistoryPage() {
               ) : (
                 items.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/70 transition-colors print:border-b print:border-slate-300">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-800 print:py-1.5 print:px-2">
-                      {row.nomor_loker}
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 font-mono font-bold text-slate-800 print:text-black">
+                      <span className="block font-bold text-[8.5pt]">{row.nomor_loker}</span>
                       {row.lokasi_loker && (
-                        <span className="block text-[10px] font-sans font-normal text-slate-400 uppercase print:text-slate-600">
-                          {row.lokasi_loker}
+                        <span className="block text-[6.5pt] font-sans font-normal text-slate-400 uppercase print:text-slate-600 leading-tight">
+                          {row.lokasi_loker.replace(/Lantai\s*/i, 'Lt. ')}
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2">
-                      <p className="font-semibold text-slate-800">{row.member_name || row.member_id}</p>
-                      <p className="text-slate-400 text-[11px] font-mono print:text-slate-600">
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5">
+                      <p className="font-semibold text-slate-800 print:text-black print:text-[8pt] leading-tight">
+                        {row.member_name || row.member_id}
+                      </p>
+                      <p className="text-slate-400 text-[11px] font-mono print:text-slate-600 print:text-[7pt] mt-0.5">
                         {row.member_id}
                       </p>
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2">
-                      <p className="font-semibold text-slate-800">{row.member_instansi || row.fakultas || '-'}</p>
-                      <p className="text-slate-500 text-[11px]">{row.inst_name || row.prodi || '-'}</p>
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5">
+                      <p className="font-semibold text-slate-800 print:text-black print:text-[7.5pt] leading-tight">
+                        {row.member_instansi || row.fakultas || '-'}
+                      </p>
+                      <p className="text-slate-500 text-[11px] print:text-slate-600 print:text-[7pt] leading-tight mt-0.5">
+                        {row.inst_name || row.prodi || '-'}
+                      </p>
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-700">
-                      {formatDate(row.tanggal_pinjam)}
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 text-slate-700 print:text-black text-[7.5pt]">
+                      <div className="print:hidden">{formatDate(row.tanggal_pinjam)}</div>
+                      <div className="hidden print:block leading-tight">{renderDateTime(row.tanggal_pinjam)}</div>
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-700">
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 text-slate-700 print:text-black text-[7.5pt]">
                       {row.tanggal_kembali ? (
-                        formatDate(row.tanggal_kembali)
+                        <>
+                          <div className="print:hidden">{formatDate(row.tanggal_kembali)}</div>
+                          <div className="hidden print:block leading-tight">{renderDateTime(row.tanggal_kembali)}</div>
+                        </>
                       ) : (
-                        <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded text-[11px] border border-amber-200">
-                          Sedang Dipinjam
-                        </span>
+                        <>
+                          <span className="print:hidden text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                            Sedang Dipinjam
+                          </span>
+                          <span className="hidden print:inline-block font-semibold text-[7pt] text-amber-900 border border-amber-300 px-1 py-0.5 rounded bg-amber-50">
+                            Dipinjam
+                          </span>
+                        </>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2">
-                      <div className="flex flex-col gap-1 items-start">
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5">
+                      <div className="flex flex-col gap-1 items-start print:hidden">
                         <Badge status={row.status} size="sm" />
                         {row.status === 'kunci_hilang' && (
                           <button
                             type="button"
                             onClick={() => handleRecoverLostKey(row)}
-                            className="print:hidden text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                            className="text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                             title="Konfirmasi bahwa kunci fisik telah dikembalikan dan kondisi kunci sekarang aman"
                           >
                             <ShieldCheck className="w-3 h-3 text-emerald-600" />
@@ -354,17 +398,40 @@ export default function HistoryPage() {
                           </span>
                         )}
                       </div>
+                      {/* Tampilan Status Khusus Cetak Print */}
+                      <div className="hidden print:block text-[7.5pt] leading-tight">
+                        {row.status === 'selesai' ? (
+                          <div>
+                            <span className="font-semibold text-emerald-900">Selesai</span>
+                            {row.catatan && (row.catatan.toLowerCase().includes('hilang') || row.catatan.toLowerCase().includes('pulih')) && (
+                              <span className="block text-[6.5pt] text-slate-600 font-normal mt-0.5">
+                                (Kunci Pulih)
+                              </span>
+                            )}
+                          </div>
+                        ) : row.status === 'kunci_hilang' ? (
+                          <span className="font-bold text-red-700 uppercase text-[7pt]">Kunci Hilang</span>
+                        ) : (
+                          <span className="font-semibold text-blue-900">Aktif</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2 font-medium">
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 font-medium print:text-right">
                       {parseFloat(row.denda) > 0 ? (
-                        <span className="text-rose-600 print:text-black font-bold">{formatRupiah(row.denda)}</span>
+                        <span className="text-rose-600 print:text-black font-bold text-[7.5pt]">{formatRupiah(row.denda)}</span>
                       ) : (
-                        <span className="text-slate-400 print:text-slate-600">Rp 0</span>
+                        <span className="text-slate-400 print:text-slate-600 text-[7.5pt]">Rp 0</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 print:py-1.5 print:px-2 text-slate-500 text-[11px] print:text-slate-700">
-                      <p>Pinjam: {row.petugas_pinjam || '-'}</p>
-                      <p>Kembali: {row.petugas_kembali || '-'}</p>
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 text-slate-500 text-[11px] print:text-black print:text-[7pt] leading-tight">
+                      <div className="print:hidden">
+                        <p>Pinjam: {row.petugas_pinjam || '-'}</p>
+                        <p>Kembali: {row.petugas_kembali || '-'}</p>
+                      </div>
+                      <div className="hidden print:block space-y-0.5">
+                        <p><span className="text-slate-500 font-medium">P:</span> {formatPetugas(row.petugas_pinjam)}</p>
+                        <p><span className="text-slate-500 font-medium">K:</span> {formatPetugas(row.petugas_kembali)}</p>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -374,20 +441,20 @@ export default function HistoryPage() {
         </div>
 
         {/* Tanda Tangan Cetak Laporan (Hanya Muncul Saat Print) */}
-        <div className="hidden print:grid grid-cols-2 gap-8 pt-8 mt-6 text-xs text-center border-t border-slate-300">
+        <div className="hidden print:grid grid-cols-2 gap-8 pt-6 mt-4 text-xs text-center border-t border-slate-300 break-inside-avoid page-break-inside-avoid">
           <div>
-            <p>Petugas Sirkulasi,</p>
-            <div className="h-16"></div>
-            <p className="font-bold underline">( ............................................ )</p>
-            <p className="text-[10px] text-slate-500">NIP / ID Petugas</p>
+            <p className="text-[8pt] text-slate-700">Petugas Sirkulasi,</p>
+            <div className="h-14"></div>
+            <p className="font-bold underline text-[8.5pt] text-black">( ............................................ )</p>
+            <p className="text-[7.5pt] text-slate-500">NIP / ID Petugas</p>
           </div>
           <div>
-            <p>Pekanbaru, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p>Mengetahui,</p>
-            <p className="font-bold">Kepala UPA Perpustakaan UNRI</p>
+            <p className="text-[8pt] text-slate-700">Pekanbaru, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-[8pt] text-slate-700">Mengetahui,</p>
+            <p className="font-bold text-[8.5pt] text-black">Kepala UPA Perpustakaan UNRI</p>
             <div className="h-12"></div>
-            <p className="font-bold underline">( ............................................ )</p>
-            <p className="text-[10px] text-slate-500">NIP.</p>
+            <p className="font-bold underline text-[8.5pt] text-black">( ............................................ )</p>
+            <p className="text-[7.5pt] text-slate-500">NIP.</p>
           </div>
         </div>
 

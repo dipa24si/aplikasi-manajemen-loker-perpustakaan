@@ -40,8 +40,8 @@
    ========================================================= */
 @media print {
   @page {
-    size: auto;
-    margin: 8mm;
+    size: A4 portrait;
+    margin: 6mm;
   }
 
   /* Sembunyikan elemen navigasi website saat mencetak */
@@ -127,34 +127,76 @@
   }
 
   /* -------------------------------------------------------------
-     KASUS 2: Cetak Laporan Riwayat (History Report)
+     KASUS 2: Cetak Laporan Riwayat (History Report) A4 Resmi & Rapih
      ------------------------------------------------------------- */
+  body:has(#history-report) {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body:has(#history-report) * {
+    visibility: hidden;
+  }
+
+  body:has(#history-report) #history-report,
+  body:has(#history-report) #history-report * {
+    visibility: visible;
+  }
+
   #history-report {
-    display: block !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
     background: white !important;
     color: black !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    padding: 6mm 6mm !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  #history-report .overflow-x-auto {
+    overflow: visible !important;
   }
 
   #history-report table {
     width: 100% !important;
+    table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 9.5pt !important;
+    font-size: 7.5pt !important;
+    line-height: 1.25 !important;
   }
 
-  #history-report th,
-  #history-report td {
-    border: 1px solid #64748b !important;
-    padding: 6px 8px !important;
-    color: black !important;
+  #history-report thead {
+    display: table-header-group !important;
   }
 
-  #history-report thead th {
+  #history-report tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #history-report th {
     background-color: #f1f5f9 !important;
-    font-weight: bold !important;
-    color: black !important;
+    border: 1px solid #1e293b !important;
+    padding: 4px 4px !important;
+    font-weight: 700 !important;
+    color: #000 !important;
+    text-align: left !important;
+    font-size: 7.5pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #history-report td {
+    border: 1px solid #94a3b8 !important;
+    padding: 3px 4px !important;
+    color: #000 !important;
+    vertical-align: middle !important;
+    word-break: break-word !important;
+    font-size: 7.5pt !important;
   }
 
   /* -------------------------------------------------------------

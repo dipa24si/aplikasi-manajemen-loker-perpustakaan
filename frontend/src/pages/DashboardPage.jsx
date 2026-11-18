@@ -82,21 +82,6 @@ export default function DashboardPage() {
             Pantau ketersediaan loker, transaksi aktif, dan status pengembalian secara real-time.
           </p>
         </div>
-
-        {/* Quick Action Button */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setSelectedLoker(null);
-              setIsPinjamOpen(true);
-            }}
-            disabled={availableLokers.length === 0}
-            className="flex items-center gap-2 bg-[#031633] hover:bg-[#1a2b49] text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition-all disabled:opacity-50 cursor-pointer"
-          >
-            <span className="text-[#ffdcc0] font-bold text-sm">+</span>
-            <span>Pinjamkan Loker</span>
-          </button>
-        </div>
       </div>
 
       {/* 2. Top Metric Cards */}
