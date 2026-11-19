@@ -14,7 +14,8 @@ import {
   MapPin,
   Clock,
   AlertTriangle,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 
 export default function TransaksiPage() {
@@ -68,6 +69,17 @@ export default function TransaksiPage() {
     }
   }, []);
 
+  // Otomatis hilangkan notifikasi pengembalian berhasil setelah 10 detik
+  useEffect(() => {
+    if (!successInfo) return;
+
+    const timer = setTimeout(() => {
+      setSuccessInfo(null);
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [successInfo]);
+
   // Gabungkan seluruh lokasi dari loker yang ada dan seluruh anjungan kiosk terdaftar
   const uniqueLocations = useMemo(() => {
     const lockerLocs = allLokers.map((l) => l.lokasi).filter(Boolean);
@@ -96,6 +108,11 @@ export default function TransaksiPage() {
   const lockersToPrint = useMemo(() => {
     return allLokers.filter((l) => selectedLokerIds.has(l.id));
   }, [allLokers, selectedLokerIds]);
+
+  // Loker yang sedang aktif dipinjam oleh mahasiswa (menunggu pengembalian kunci)
+  const activeLoans = useMemo(() => {
+    return allLokers.filter((l) => l.peminjaman_aktif_id || (l.status === 'terpakai' && l.member_id));
+  }, [allLokers]);
 
   const handleToggleLokerSelect = (id) => {
     setSelectedLokerIds((prev) => {
@@ -192,22 +209,36 @@ export default function TransaksiPage() {
         </div>
       </div>
 
-      {/* NOTIFIKASI SUKSES PENGEMBALIAN */}
+      {/* NOTIFIKASI SUKSES PENGEMBALIAN (Otomatis hilang setelah 10 detik) */}
       {successInfo && (
-        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-3xl p-6 text-emerald-950 shadow-sm animate-in fade-in zoom-in-95 duration-150 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
-              <CheckCircle className="w-7 h-7" />
+        <div className="relative bg-emerald-50 border-2 border-emerald-300 rounded-3xl p-6 text-emerald-950 shadow-sm animate-in fade-in zoom-in-95 duration-150 space-y-3 overflow-hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                <CheckCircle className="w-7 h-7" />
+              </div>
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5 flex-wrap">
+                  {successInfo.is_recovered && <span className="px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-800 text-[10px] font-black">KUNCI PULIH</span>}
+                  <span>{successInfo.is_recovered ? 'KUNCI HILANG BERHASIL DITERIMA KEMBALI' : 'PENGEMBALIAN BERHASIL'}</span>
+                  <span className="text-[10px] font-normal text-emerald-600 lowercase bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
+                    otomatis hilang dalam 10 dtk
+                  </span>
+                </span>
+                <h3 className="text-xl font-black text-emerald-900 mt-0.5">
+                  Kunci Loker {successInfo.nomor_loker} {successInfo.is_recovered ? 'Telah Diterima & Aman' : 'Diterima'}
+                </h3>
+              </div>
             </div>
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
-                {successInfo.is_recovered && <span className="px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-800 text-[10px] font-black">KUNCI PULIH</span>}
-                <span>{successInfo.is_recovered ? 'KUNCI HILANG BERHASIL DITERIMA KEMBALI' : 'PENGEMBALIAN BERHASIL'}</span>
-              </span>
-              <h3 className="text-xl font-black text-emerald-900">
-                Kunci Loker {successInfo.nomor_loker} {successInfo.is_recovered ? 'Telah Diterima & Aman' : 'Diterima'}
-              </h3>
-            </div>
+
+            <button
+              type="button"
+              onClick={() => setSuccessInfo(null)}
+              className="p-1.5 text-emerald-700 hover:text-emerald-950 hover:bg-emerald-200/60 rounded-xl transition-colors cursor-pointer shrink-0"
+              title="Tutup Notifikasi Sekarang"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="bg-white/80 rounded-2xl p-4 border border-emerald-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -234,6 +265,11 @@ export default function TransaksiPage() {
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Garis Countdown 10 Detik */}
+          <div className="w-full bg-emerald-200/50 h-1 rounded-full overflow-hidden mt-1">
+            <div className="bg-emerald-500 h-full animate-dismiss-progress"></div>
           </div>
         </div>
       )}
@@ -265,20 +301,22 @@ export default function TransaksiPage() {
               Bebas batas waktu pinjam. Denda hanya dikenakan apabila kunci loker hilang (lapor ke petugas).
             </p>
           </div>
-          <span className="text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full">
-            {allLokers.filter((l) => l.status !== 'kosong').length} Kunci di Luar
+          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+            activeLoans.length > 0
+              ? 'text-rose-800 bg-rose-50 border-rose-200'
+              : 'text-emerald-800 bg-emerald-50 border-emerald-200'
+          }`}>
+            {activeLoans.length > 0 ? `${activeLoans.length} Kunci di Luar` : '0 Kunci di Luar (Semua Ada)'}
           </span>
         </div>
 
-        {allLokers.filter((l) => l.peminjaman_aktif_id || (l.status === 'terpakai' && l.member_id)).length === 0 ? (
+        {activeLoans.length === 0 ? (
           <div className="py-8 text-center text-[#75777e] text-xs">
             🎉 Semua kunci telah dikembalikan! Semua loker saat ini berstatus <b>Available</b>.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {allLokers
-              .filter((l) => l.peminjaman_aktif_id || (l.status === 'terpakai' && l.member_id))
-              .map((loker) => {
+            {activeLoans.map((loker) => {
                 const late = isOverdue(loker.batas_kembali, loker.status);
                 const infoDenda = hitungDenda(loker.batas_kembali);
 

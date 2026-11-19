@@ -62,7 +62,7 @@ export default function HistoryPage() {
 
   const handleRecoverLostKey = async (row) => {
     const confirm = window.confirm(
-      `Konfirmasi penerimaan kunci loker ${row.nomor_loker} dari ${row.member_name || row.member_id}?\n\nStatus loker akan otomatis kembali AVAILABLE dan keterangannya menjadi 'Kondisi aman (kunci telah dikembalikan)'. Denda dibebaskan.`
+      `Konfirmasi penerimaan kunci loker ${row.nomor_loker} dari ${row.member_name || row.member_id}?\n\nStatus loker akan otomatis kembali AVAILABLE dan keterangannya menjadi 'Kondisi aman (kunci telah dikembalikan)'.`
     );
     if (!confirm) return;
 
@@ -108,8 +108,9 @@ export default function HistoryPage() {
         'Waktu Pinjam': row.tanggal_pinjam ? formatDate(row.tanggal_pinjam) : '-',
         'Waktu Kembali': row.tanggal_kembali ? formatDate(row.tanggal_kembali) : 'Sedang Dipinjam',
         'Status': row.status === 'selesai' ? 'Selesai' : row.status === 'kunci_hilang' ? 'Kunci Hilang' : 'Aktif',
-        'Denda Kunci Hilang (Rp)': parseFloat(row.denda) || 0,
-        'Petugas Pinjam': row.petugas_pinjam || '-',
+        'Denda (Rp)': parseFloat(row.denda) || 0,
+        'Status Denda': parseFloat(row.denda) > 0 ? (row.status === 'selesai' ? 'Telah Dibayarkan' : 'Belum Bayar') : 'Bebas Denda',
+        'Petugas Pinjam': row.petugas_pinjam && row.petugas_pinjam !== '-' ? row.petugas_pinjam : 'Monitor Kiosk',
         'Petugas Kembali': row.petugas_kembali || '-',
         'Catatan': row.catatan || '-'
       }));
@@ -149,8 +150,10 @@ export default function HistoryPage() {
     window.print();
   };
 
-  const formatPetugas = (name) => {
-    if (!name || name === '-') return '-';
+  const formatPetugas = (name, isPinjam = false) => {
+    if (!name || name === '-') {
+      return isPinjam ? 'Monitor Kiosk' : '-';
+    }
     if (name.toLowerCase().includes('administrator')) return 'Admin Perpus';
     return name;
   };
@@ -171,7 +174,15 @@ export default function HistoryPage() {
     return <span className="text-black">{formatted}</span>;
   };
 
-  const totalDendaPage = items.reduce((sum, item) => sum + (parseFloat(item.denda) || 0), 0);
+  // Denda yang belum dibayar (transaksi yang masih berstatus kunci hilang / aktif)
+  const totalDendaBelumBayar = items
+    .filter((item) => item.status !== 'selesai')
+    .reduce((sum, item) => sum + (parseFloat(item.denda) || 0), 0);
+
+  // Total denda yang sudah lunas dibayarkan
+  const totalDendaLunas = items
+    .filter((item) => item.status === 'selesai')
+    .reduce((sum, item) => sum + (parseFloat(item.denda) || 0), 0);
 
   return (
     <div id="history-report" className="space-y-5">
@@ -205,7 +216,7 @@ export default function HistoryPage() {
           LAPORAN RIWAYAT TRANSAKSI PEMINJAMAN LOKER
         </h3>
         <p className="text-[8pt] text-slate-600 mt-0.5">
-          Dicetak pada: {formatDate(new Date())} | Total Data: {pagination.total} Transaksi | Total Denda: {formatRupiah(totalDendaPage)}
+          Dicetak pada: {formatDate(new Date())} | Total Data: {pagination.total} Transaksi | Denda Belum Bayar: {formatRupiah(totalDendaBelumBayar)}
         </p>
       </div>
 
@@ -255,12 +266,15 @@ export default function HistoryPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="flex-1 sm:flex-none text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            className="flex-1 sm:flex-none text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 sm:px-3 py-2 text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer font-medium"
           >
             <option value="semua">Semua Status</option>
             <option value="aktif">Sedang Dipinjam (Aktif)</option>
             <option value="selesai">Selesai Dikembalikan</option>
             <option value="kunci_hilang">Kunci Hilang</option>
+            <option disabled className="text-slate-300">──────────</option>
+            <option value="belum_bayar">⚠️ Denda Belum Bayar</option>
+            <option value="sudah_bayar">✓ Denda Sudah Bayar (Lunas)</option>
           </select>
 
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
@@ -295,9 +309,22 @@ export default function HistoryPage() {
           <FileText className="w-4 h-4 text-indigo-600" />
           <span>Total Transaksi: <b className="text-slate-800">{pagination.total}</b> baris</span>
         </div>
-        <div className="flex items-center gap-2 font-medium">
-          <DollarSign className="w-4 h-4 text-emerald-600" />
-          <span>Total Denda di Halaman Ini: <b className="text-emerald-700 font-bold">{formatRupiah(totalDendaPage)}</b></span>
+        <div className="flex flex-wrap items-center gap-3 font-medium">
+          <div className="flex items-center gap-1.5">
+            <DollarSign className={`w-4 h-4 ${totalDendaBelumBayar > 0 ? 'text-rose-600' : 'text-slate-400'}`} />
+            <span>
+              Total Denda (Belum Bayar):{' '}
+              <b className={totalDendaBelumBayar > 0 ? 'text-rose-700 font-bold' : 'text-slate-700 font-bold'}>
+                {formatRupiah(totalDendaBelumBayar)}
+              </b>
+            </span>
+          </div>
+          {totalDendaLunas > 0 && (
+            <div className="flex items-center gap-1 text-slate-500 text-[11px] border-l border-slate-300 pl-3">
+              <span>Sudah Lunas:</span>
+              <b className="text-emerald-700 font-semibold">{formatRupiah(totalDendaLunas)}</b>
+            </div>
+          )}
         </div>
       </div>
 
@@ -416,21 +443,56 @@ export default function HistoryPage() {
                         )}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 font-medium print:text-right">
+                    <td className="py-2.5 px-3 print:py-1 print:px-1.5 font-medium">
                       {parseFloat(row.denda) > 0 ? (
-                        <span className="text-rose-600 print:text-black font-bold text-[7.5pt]">{formatRupiah(row.denda)}</span>
+                        row.status === 'selesai' ? (
+                          <div>
+                            <span className="text-[#031633] font-bold text-xs block print:text-black print:text-[7.5pt]">
+                              {formatRupiah(row.denda)}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-0.5 print:hidden">
+                              ✓ Telah Dibayarkan
+                            </span>
+                            <span className="hidden print:block text-[6.5pt] text-slate-600">
+                              (Lunas)
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-rose-700 font-bold text-xs block print:text-black print:text-[7.5pt]">
+                              {formatRupiah(row.denda)}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded mt-0.5 print:hidden">
+                              Belum Bayar
+                            </span>
+                            <span className="hidden print:block text-[6.5pt] text-rose-600">
+                              (Belum Bayar)
+                            </span>
+                          </div>
+                        )
                       ) : (
-                        <span className="text-slate-400 print:text-slate-600 text-[7.5pt]">Rp 0</span>
+                        <div>
+                          <span className="text-slate-400 print:text-slate-600 text-xs print:text-[7.5pt]">Rp 0</span>
+                          <span className="block text-[9.5px] text-slate-400 print:hidden mt-0.5">Bebas Denda</span>
+                        </div>
                       )}
                     </td>
                     <td className="py-2.5 px-3 print:py-1 print:px-1.5 text-slate-500 text-[11px] print:text-black print:text-[7pt] leading-tight">
-                      <div className="print:hidden">
-                        <p>Pinjam: {row.petugas_pinjam || '-'}</p>
-                        <p>Kembali: {row.petugas_kembali || '-'}</p>
+                      <div className="print:hidden space-y-0.5">
+                        <p>
+                          <span className="text-slate-400">Pinjam:</span>{' '}
+                          <span className={!row.petugas_pinjam || row.petugas_pinjam === '-' ? 'text-indigo-700 font-semibold' : 'text-slate-800 font-medium'}>
+                            {row.petugas_pinjam && row.petugas_pinjam !== '-' ? row.petugas_pinjam : 'Monitor Kiosk'}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-slate-400">Kembali:</span>{' '}
+                          <span className="text-slate-800 font-medium">{row.petugas_kembali || '-'}</span>
+                        </p>
                       </div>
                       <div className="hidden print:block space-y-0.5">
-                        <p><span className="text-slate-500 font-medium">P:</span> {formatPetugas(row.petugas_pinjam)}</p>
-                        <p><span className="text-slate-500 font-medium">K:</span> {formatPetugas(row.petugas_kembali)}</p>
+                        <p><span className="text-slate-500 font-medium">P:</span> {formatPetugas(row.petugas_pinjam, true)}</p>
+                        <p><span className="text-slate-500 font-medium">K:</span> {formatPetugas(row.petugas_kembali, false)}</p>
                       </div>
                     </td>
                   </tr>

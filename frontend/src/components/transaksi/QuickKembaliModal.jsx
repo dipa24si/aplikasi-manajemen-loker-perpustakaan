@@ -28,17 +28,17 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
 
   useEffect(() => {
     if (isOpen && loker) {
+      setError('');
+      setIsKeyLost(false);
       if (isAlreadyLost) {
         setCatatan('Kondisi aman (kunci telah dikembalikan)');
         setDenda(0);
-      } else if (isKeyLost) {
-        setCatatan('Kunci hilang dilaporkan mahasiswa.');
       } else {
-        setDenda('');
+        setDenda(0);
         setCatatan('');
       }
     }
-  }, [isOpen, loker, isKeyLost, isAlreadyLost]);
+  }, [isOpen, loker?.id]);
 
   if (!isOpen || !loker) return null;
 
@@ -49,7 +49,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
       setDenda(''); // Input manual oleh petugas
       setCatatan('Kunci hilang dilaporkan mahasiswa.');
     } else {
-      setDenda('');
+      setDenda(0);
       setCatatan('');
     }
   };
@@ -74,7 +74,7 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
         await peminjamanApi.kembali({
           loker_id: loker.id,
           status: isKeyLost ? 'kunci_hilang' : 'selesai',
-          denda: denda !== '' ? (parseFloat(denda) || 0) : 0,
+          denda: isKeyLost && denda !== '' ? (parseFloat(denda) || 0) : 0,
           catatan: catatan.trim() || null
         });
       }
@@ -207,21 +207,27 @@ export default function QuickKembaliModal({ isOpen, onClose, loker, onSuccess })
               </label>
             </div>
 
-            {/* Input Denda */}
-            <div>
-              <label className="block text-xs font-semibold text-[#44474e] uppercase tracking-wider mb-1.5">
-                Total Denda yang Dikenakan (Rp)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1000"
-                placeholder="0"
-                value={denda}
-                onChange={(e) => setDenda(e.target.value)}
-                className="w-full bg-[#faf9f6] border border-[#c5c6ce] rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-[#8b500b]/30 focus:border-[#8b500b]"
-              />
-            </div>
+            {/* Input Denda: Hanya Muncul Ketika Checkbox Kunci Hilang Dipilih */}
+            {isKeyLost && (
+              <div className="space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                <label className="block text-xs font-semibold text-rose-900 uppercase tracking-wider">
+                  Total Denda Ganti Rugi Kunci (Rp)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder="0"
+                  value={denda}
+                  onChange={(e) => setDenda(e.target.value)}
+                  className="w-full bg-[#faf9f6] border border-rose-300 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-[#031633] focus:outline-hidden focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+                  autoFocus
+                />
+                <p className="text-[10px] text-rose-600">
+                  Nominal denda penggantian anak kunci yang harus dibayarkan mahasiswa.
+                </p>
+              </div>
+            )}
 
             {/* Catatan */}
             <div>

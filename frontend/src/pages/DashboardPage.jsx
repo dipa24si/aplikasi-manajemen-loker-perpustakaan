@@ -158,7 +158,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="font-bold text-[#031633]">{act.nama_anggota}</p>
                     <p className="text-[#75777e] text-[11px]">
-                      ID: {act.member_id} • Dilayani oleh: {act.nama_petugas_pinjam || 'Petugas'}
+                      ID: {act.member_id} • Dilayani oleh: {act.nama_petugas_pinjam || 'Monitor Kiosk'}
                     </p>
                   </div>
                 </div>

@@ -295,7 +295,6 @@ async function kembali(req, res, next) {
             `UPDATE peminjaman 
              SET status = 'selesai', 
                  tanggal_kembali = NOW(), 
-                 denda = 0, 
                  catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci yang sempat dilaporkan hilang telah dikembalikan. Kondisi kunci aman.'),
                  petugas_kembali_id = ?
              WHERE id = ?`,
@@ -384,7 +383,6 @@ async function kembali(req, res, next) {
         `UPDATE peminjaman 
          SET status = 'selesai', 
              tanggal_kembali = NOW(), 
-             denda = 0, 
              catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci yang sempat dilaporkan hilang telah dikembalikan. Kondisi kunci aman.'),
              petugas_kembali_id = ?
          WHERE id = ?`,
@@ -633,7 +631,6 @@ async function pulihkanKunciHilang(req, res, next) {
         `UPDATE peminjaman 
          SET status = 'selesai', 
              tanggal_kembali = NOW(), 
-             denda = 0, 
              catatan = CONCAT(COALESCE(catatan, ''), ' | Kunci yang sempat dilaporkan hilang telah dikembalikan. Kondisi kunci aman.'),
              petugas_kembali_id = ?
          WHERE id = ?`,

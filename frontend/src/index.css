@@ -251,3 +251,17 @@
     position: relative !important;
   }
 }
+
+/* Animasi Progress Bar Auto-dismiss 10 detik */
+@keyframes autoDismissProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-dismiss-progress {
+  animation: autoDismissProgress 10s linear forwards;
+}

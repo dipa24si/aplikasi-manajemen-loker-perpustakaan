@@ -21,8 +21,14 @@ async function getHistory(req, res, next) {
     const params = [];
 
     if (status && status !== 'semua') {
-      whereClause += ' AND p.status = ?';
-      params.push(status);
+      if (status === 'sudah_bayar') {
+        whereClause += ' AND p.denda > 0 AND p.status = "selesai"';
+      } else if (status === 'belum_bayar') {
+        whereClause += ' AND ((p.denda > 0 AND p.status != "selesai") OR p.status = "kunci_hilang")';
+      } else {
+        whereClause += ' AND p.status = ?';
+        params.push(status);
+      }
     }
 
     if (start_date) {
